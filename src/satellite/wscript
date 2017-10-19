@@ -10,6 +10,8 @@ def build(bld):
     module = bld.create_ns3_module('satellite', ['core'])
     module.source = [
         'model/satellite.cc',
+        'model/satposition.cc',
+        'model/satgeometry.cc',
         'helper/satellite-helper.cc',
         ]
 
@@ -22,6 +24,8 @@ def build(bld):
     headers.module = 'satellite'
     headers.source = [
         'model/satellite.h',
+        'model/satposition.h',
+        'model/satgeometry.h',
         'helper/satellite-helper.h',
         ]
 

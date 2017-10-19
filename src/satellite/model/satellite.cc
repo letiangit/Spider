@@ -5,7 +5,21 @@
 namespace ns3 {
 
 /* ... */
-
+Satellite::Satellite()
+ {
+     
+ }
+ 
+Satellite::~Satellite()
+ {
+     
+ }
+ 
+TypeId   
+Satellite:: GetTypeId (void)
+  {
+      
+  }
 
 }
 
