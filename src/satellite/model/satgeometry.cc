@@ -147,6 +147,7 @@ SatGeometry::check_elevation(coordinate satellite,
 		// elevation angle > 0
 		theta = acos((E_2+S_2-(d*d))/(2*E*S));
 		alpha = acos(sin(theta) * S/d);
+                //std::cout << "alpha " << alpha << std::endl;
 		return ( (alpha > elev_mask_) ? alpha : 0);
 	} else
 		return 0;
@@ -168,6 +169,7 @@ int SatGeometry::are_satellites_mutually_visible(coordinate first, coordinate se
 	double c, d, min_radius, grazing_radius;
 	double radius = get_radius(first); // could just use first.r here.
 	double distance_ = distance(first, second);
+        //std::cout << "distance " << distance_ << std::endl;
 	c = radius * radius;
 	d = (distance_/2) * (distance_/2);
 	grazing_radius = (EARTH_RADIUS + ATMOS_MARGIN);

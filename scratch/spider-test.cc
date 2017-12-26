@@ -96,6 +96,46 @@ PrintSunSyn(SunSynStaPosition sat, double interval)
     std::cout << Simulator::Now().GetSeconds () << "\t " << current.r << "\t" << RAD_TO_DEG(current.theta) << "\t"  << RAD_TO_DEG(current.phi) << ", lat =" << latitude << ", lon =" << longitude  << std::endl;
 }
 
+void
+MutuallyVisible(SunSynStaPosition sun, GeoSatPosition geo, TermSatPosition ter, double interval)
+{
+    coordinate current_geo, current_sun, current_ter;
+    double longitude, radius, latitude;
+    double elev;
+    uint32_t visable;
+    
+    current_geo = geo.GetCoord ();
+    current_sun = sun.GetCoord ();
+    current_ter = ter.GetCoord ();
+    
+    std::cout << "At time (s)----------- " << Simulator::Now().GetSeconds ()  << std::endl;
+    visable = SatGeometry::are_satellites_mutually_visible(current_geo, current_sun);
+    std::cout << "GEO-SSO " << visable << std::endl;
+    
+    elev = SatGeometry::check_elevation(current_sun,  current_ter, 0);
+    if (RAD_TO_DEG(elev) > 5)
+     {
+      std::cout << "TER-SSO 1" << std::endl;
+     }
+    else
+     {
+      std::cout << "TER-SSO 0" << std::endl;
+     }
+    
+    elev = SatGeometry::check_elevation(current_geo,  current_ter, 0);
+    if (RAD_TO_DEG(elev) > 5)
+    {
+        std::cout << "TER-GEO 1" << std::endl;
+    }
+    else
+    {
+        std::cout << "TER-GEO 0" << std::endl;
+    }
+
+
+    Simulator::Schedule(Seconds(interval), MutuallyVisible, sun, geo, ter, interval);
+}
+
 
 int main (int argc, char *argv[])
 {
@@ -110,11 +150,13 @@ int main (int argc, char *argv[])
 
   double  GeoS_lon = 100 ;
     
-  double  Polar_Alti = 4189;
-  double  Polar_lon = 60;
-  double  Polar_alpha = 340;
+  double  Polar_Alti = 800;
+  double  Polar_lon = 70;
+  double  Polar_alpha = 30;
     
-  double interval = 10810.3095141;
+  //double interval = 10810.3095141;
+    
+  double interval = 108;
     
   CommandLine cmd;
   cmd.AddValue ("seed", "random seed", seed);
@@ -144,17 +186,17 @@ int main (int argc, char *argv[])
     
   SunSynS.set(Polar_Alti, Polar_lon, Polar_alpha);
   
-  std::cout << "time" << "\t" << "r "  << "\t" << "theta" << "\t" << "phi" << std::endl;
  
   //Simulator::ScheduleNow(PrintSat, TermS, interval);
-  std::cout << "time" << "\t" << "r "  << "\t" << "theta" << "\t" << "phi" << std::endl;
     
   //Simulator::ScheduleNow(PrintGeo, GeoS, interval);
   
   //Simulator::ScheduleNow(PrintPloar, PolarS, interval);
     
-  Simulator::ScheduleNow(PrintSunSyn, SunSynS, interval);
-   
+  // Simulator::ScheduleNow(PrintSunSyn, SunSynS, interval);
+    
+  Simulator::ScheduleNow(MutuallyVisible, SunSynS, GeoS, TermS, interval);
+    
 
     
   Simulator::Stop (Seconds (simulationTime));

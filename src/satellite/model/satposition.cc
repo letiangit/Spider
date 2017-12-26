@@ -211,7 +211,7 @@ PolarSatPosition::set(double Altitude, double Lon, double Alpha, double Incl)
 	double num = initialCoord.r * initialCoord.r * initialCoord.r;
 	staPeriod = 2 * PI * sqrt(num/MU); // seconds 
         //staPeriod=10810.3095141;
-         std::cout << "SunSynStaPosition/polar staPeriod (h)" << staPeriod  << "\t" << initialCoord.r << ", initialCoord.theta " << (initialCoord.theta * 180)/PI << std::endl;
+         std::cout << "SunSynStaPosition/polar staPeriod (s)" << staPeriod  << "\t" << initialCoord.r << ", initialCoord.theta " << (initialCoord.theta * 180)/PI << std::endl;
          std::cout << "SunSynStaPosition/polar inclination_" << inclination_  << std::endl;
 
 }
