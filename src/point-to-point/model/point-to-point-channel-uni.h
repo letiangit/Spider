@@ -16,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef POINT_TO_POINT_CHANNEL_H
-#define POINT_TO_POINT_CHANNEL_H
+#ifndef POINT_TO_POINT_CHANNEL_UNI_H
+#define POINT_TO_POINT_CHANNEL_UNI_H
 
 #include <list>
 #include "ns3/channel.h"
@@ -47,7 +47,7 @@ class Packet;
  * \see Attach
  * \see TransmitStart
  */
-class PointToPointChannel : public Channel 
+class PointToPointChannelUni : public Channel 
 {
 public:
   /**
@@ -58,18 +58,21 @@ public:
   static TypeId GetTypeId (void);
 
   /**
-   * \brief Create a PointToPointChannel
+   * \brief Create a PointToPointChannelUni
    *
    * By default, you get a channel that has an "infinitely" fast 
    * transmission speed and zero delay.
    */
-  PointToPointChannel ();
+  PointToPointChannelUni ();
 
   /**
    * \brief Attach a given netdevice to this channel
    * \param device pointer to the netdevice to attach to the channel
    */
   void Attach (Ptr<PointToPointNetDevice> device);
+    //void AttachSender (Ptr<PointToPointNetDevice> device);
+    //void AttachReceiver (Ptr<PointToPointNetDevice> device);
+
 
   /**
    * \brief Transmit a packet over this channel
@@ -147,7 +150,7 @@ protected:
                     
 private:
   /** Each point to point link has exactly two net devices. */
-  static const int N_DEVICES = 2;
+  static const int N_DEVICES = 2; // 3 device for unidirectional link
 
   Time          m_delay;    //!< Propagation delay
   int32_t       m_nDevices; //!< Devices of this channel
@@ -184,7 +187,7 @@ private:
   };
 
   /**
-   * \brief Wire model for the PointToPointChannel
+   * \brief Wire model for the PointToPointChannelUni
    */
   class Link
   {
@@ -205,4 +208,4 @@ public:
 
 } // namespace ns3
 
-#endif /* POINT_TO_POINT_CHANNEL_H */
+#endif /* POINT_TO_POINT_CHANNEL_UNI_H */

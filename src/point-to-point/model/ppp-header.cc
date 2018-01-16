@@ -22,6 +22,10 @@
 #include "ns3/log.h"
 #include "ns3/header.h"
 #include "ppp-header.h"
+#include "ns3/mac48-address.h"
+#include "ns3/address-utils.h"
+
+
 
 namespace ns3 {
 
@@ -31,6 +35,9 @@ NS_OBJECT_ENSURE_REGISTERED (PppHeader);
 
 PppHeader::PppHeader ()
 {
+    m_Qos = 0;
+    m_channel0 = CHANNELNOTDEFINED;
+    m_channel1 = CHANNELNOTDEFINED;
 }
 
 PppHeader::~PppHeader ()
@@ -76,26 +83,181 @@ PppHeader::Print (std::ostream &os) const
 uint32_t
 PppHeader::GetSerializedSize (void) const
 {
-  return 2;
+  //return 2; 
+ if (m_type == CHANNELREQ)
+   {
+       return 21; //(2 + 17);
+   }
+ else
+   {
+       return 19; //(2 + 17);
+   }
 }
 
 void
 PppHeader::Serialize (Buffer::Iterator start) const
 {
-  start.WriteHtonU16 (m_protocol);
+   //start.WriteHtonU16 (m_protocol);
+   uint8_t temp;
+   //printf (" m_type %d \n", m_type);
+   NS_ASSERT (m_type < 64);
+
+   
+   temp = ((m_type & 0x3f) << 2 ) |  (m_Qos & 0x03);
+   uint32_t temp_id;
+   temp_id = (m_ttl << 24 ) ||  m_id; 
+   
+  //printf ("Serialize %d,  m_type %d \n", temp, m_type);
+  start.WriteHtolsbU16 (m_protocol);
+  start.WriteU8 (temp);
+  start.WriteHtolsbU32 (temp_id);
+  WriteTo (start, m_addressSrc);
+  WriteTo (start, m_addressDest);
+  if (m_type == CHANNELREQ)
+   {
+      start.WriteU8 (m_channel0);
+      start.WriteU8 (m_channel1);
+   }
+  //NS_LOG_UNCOND ("m_protocol " << m_protocol << "\t" << m_addressSrc << "\t" << m_addressDest );
 }
 
 uint32_t
 PppHeader::Deserialize (Buffer::Iterator start)
 {
-  m_protocol = start.ReadNtohU16 ();
-  return GetSerializedSize ();
+  //m_protocol = start.ReadNtohU16 ();
+  //return GetSerializedSize ();
+  
+  uint8_t temp;
+  uint32_t temp_id;
+  
+  Buffer::Iterator i = start;
+
+  m_protocol = i.ReadLsbtohU16 ();
+  temp = i.ReadU8 ();
+  //printf ("Deserialize %d \n", temp);
+  m_type = (temp >> 2) & 0x3f;
+  //printf ("m_type %d \n", m_type);
+  NS_ASSERT (m_type < 64);
+  temp_id = i.ReadLsbtohU32 ();
+  ReadFrom (i, m_addressSrc);
+  ReadFrom (i, m_addressDest);
+  if (m_type == CHANNELREQ)
+   {
+      m_channel0 = i.ReadU8 ();
+      m_channel1 = i.ReadU8 ();
+   } 
+  return i.GetDistanceFrom (start);
+  //NS_LOG_UNCOND ("m_protocol " << m_protocol << "\t" << m_addressSrc << "\t" << m_addressDest );
 }
 
-void
+void 
 PppHeader::SetProtocol (uint16_t protocol)
 {
   m_protocol=protocol;
+}
+
+void
+PppHeader::SetType (uint8_t type)
+{
+  m_type = type;
+  //std::cout << "m_type is " << m_type << std::endl;
+ // NS_LOG_UNCOND("set m_type  " << m_type );
+  //printf("SetType %d \n", m_type);
+  NS_ASSERT (m_type < 64);
+}
+
+void
+PppHeader::SetQos (uint8_t qos)
+{
+  m_Qos=qos;
+}
+
+void
+PppHeader::SetTTL (uint8_t ttl)
+{
+  m_ttl=ttl;
+}
+
+void
+PppHeader::SetID (uint32_t id)
+{
+  m_id=id;
+}
+
+void
+PppHeader::SetSourceAddre (Mac48Address addr)
+{
+  m_addressSrc=addr;
+}
+
+void
+PppHeader::SetDestAddre (Mac48Address addr)
+{
+  m_addressDest=addr;
+}
+
+
+void
+PppHeader::SetUsedChannel0(uint8_t channel)
+{
+  m_channel0 = channel;
+}
+
+void
+PppHeader::SetUsedChannel1(uint8_t channel)
+{
+  m_channel1 = channel;
+}
+
+
+uint8_t 
+PppHeader::GetUsedChannel0(void) const
+{
+  return m_channel0;
+}
+
+uint8_t
+PppHeader::GetUsedChannel1(void) const
+{
+  return m_channel1;
+}
+
+
+uint8_t
+PppHeader::GetType (void) const
+{
+  //printf("GetType is %d \n", m_type);
+  return m_type;
+}
+
+uint8_t
+PppHeader::GetQos (void) const
+{
+  return m_Qos;
+}
+
+uint8_t
+PppHeader::GetTTL (void) const
+{
+  return m_ttl;
+}
+
+uint32_t
+PppHeader::GetID (void) const
+{
+  return m_id;
+}
+
+Mac48Address
+PppHeader::GetSourceAddre (void) const
+{
+  return m_addressSrc;
+}
+
+Mac48Address
+PppHeader::GetDestAddre (void) const
+{
+  return m_addressDest;
 }
 
 uint16_t

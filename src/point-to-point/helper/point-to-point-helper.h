@@ -21,10 +21,15 @@
 #define POINT_TO_POINT_HELPER_H
 
 #include <string>
+#include <list>
+#include <vector>
+#include <map>
 
 #include "ns3/object-factory.h"
 #include "ns3/net-device-container.h"
 #include "ns3/node-container.h"
+#include "ns3/point-to-point-net-device.h"
+
 
 #include "ns3/trace-helper.h"
 
@@ -33,6 +38,7 @@ namespace ns3 {
 class Queue;
 class NetDevice;
 class Node;
+class PointToPointNetDevice;
 
 /**
  * \brief Build a set of PointToPointNetDevice objects
@@ -123,6 +129,8 @@ public:
    * appropriate remote point-to-point channels are created.
    */
   NetDeviceContainer Install (Ptr<Node> a, Ptr<Node> b);
+  NetDeviceContainer InstallUni (Ptr<Node> a, Ptr<Node> b);
+
 
   /**
    * \param a first node
@@ -184,8 +192,20 @@ private:
 
   ObjectFactory m_queueFactory;         //!< Queue Factory
   ObjectFactory m_channelFactory;       //!< Channel Factory
+  ObjectFactory m_channelUniFactory;       //!< Channel Factory
   ObjectFactory m_remoteChannelFactory; //!< Remote Channel Factory
   ObjectFactory m_deviceFactory;        //!< Device Factory
+  
+  
+  std::list< Ptr<Node> > m_nodeList;
+  std::list< Ptr<Node> >::iterator m_nodeListIterator;
+  std::map<uint32_t, Ptr<PointToPointNetDevice> > m_nodeDeviceMap;
+
+  //Ptr<NetDevice> devA;
+  //Ptr<NetDevice> devB;
+  Ptr<PointToPointNetDevice> devA;
+  Ptr<PointToPointNetDevice> devB;
+  NetDeviceContainer m_containerUni;
 };
 
 } // namespace ns3

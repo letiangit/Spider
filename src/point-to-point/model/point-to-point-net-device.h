@@ -30,12 +30,29 @@
 #include "ns3/data-rate.h"
 #include "ns3/ptr.h"
 #include "ns3/mac48-address.h"
+#include "ns3/event-id.h"
+
 
 namespace ns3 {
 
+
+    
+const uint32_t ChannelResp_delay = 21; // second
+const uint32_t ChannelConf_delay = 17; //
+const Time Channel_delay_packet = Seconds (1); // one packet
+const Time ChannelWaiting_Interval = Seconds (1); // 4  channel
+const uint32_t CCmin = 1 ;
+const uint32_t CCmax = 100;
+const uint32_t backoffcounter = 20;
+
 class Queue;
 class PointToPointChannel;
+class PointToPointChannelUni;
 class ErrorModel;
+class UniformRandomVariable;
+
+
+
 
 /**
  * \defgroup point-to-point Point-To-Point Network Device
@@ -62,6 +79,13 @@ class ErrorModel;
 class PointToPointNetDevice : public NetDevice
 {
 public:
+    #define CHANNELREQ 17
+    #define CHANNELRESP 18
+    #define CHANNELCONF 19
+    #define CHANNELACK 33
+
+    #define CHANNELNOTDEFINED 255
+
   /**
    * \brief Get the TypeId
    *
@@ -108,7 +132,10 @@ public:
    * \param ch Ptr to the channel to which this object is being attached.
    * \return true if the operation was successfull (always true actually)
    */
-  bool Attach (Ptr<PointToPointChannel> ch);
+  //bool Attach (Ptr<PointToPointChannel> ch);
+  bool Attach (Ptr<PointToPointChannelUni> ch);
+  bool Attach (Ptr<PointToPointChannelUni> ch, uint8_t rx);
+
 
   /**
    * Attach a queue to the PointToPointNetDevice.
@@ -148,6 +175,11 @@ public:
    * \param p Ptr to the received packet.
    */
   void Receive (Ptr<Packet> p);
+  void ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel);
+  void WaitChannel ();
+  void ChangeTxChannel ();
+
+
 
   // The remaining methods are documented in ns3::NetDevice*
 
@@ -170,6 +202,7 @@ public:
   typedef void (* LinkChangeTracedCallback) (void);
   
   virtual void AddLinkChangeCallback (Callback<void> callback);
+  virtual void TryToSetLinkChannel (void);
 
   virtual bool IsBroadcast (void) const;
   virtual Address GetBroadcast (void) const;
@@ -182,6 +215,19 @@ public:
 
   virtual bool Send (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber);
   virtual bool SendFrom (Ptr<Packet> packet, const Address& source, const Address& dest, uint16_t protocolNumber);
+  virtual void SendChannelRequest (void);
+  //virtual void SendChannelResponse ();
+  virtual void SendChannelResponse (Mac48Address dest, uint8_t channel0, uint8_t channel1);
+  virtual void SendChannelACK (Mac48Address dest, uint32_t packetid);
+  virtual void Forward (Ptr<Packet> packet, uint8_t count);
+
+
+
+  virtual void SendChannelConf ();
+  virtual void SendChannelRequestPacket (uint8_t counter);
+  virtual void SendChannelResponsePacket (uint8_t counter);
+
+
 
   virtual Ptr<Node> GetNode (void) const;
   virtual void SetNode (Ptr<Node> node);
@@ -194,6 +240,7 @@ public:
 
   virtual void SetPromiscReceiveCallback (PromiscReceiveCallback cb);
   virtual bool SupportsSendFrom (void) const;
+  
 
 protected:
   /**
@@ -204,6 +251,31 @@ protected:
   void DoMpiReceive (Ptr<Packet> p);
 
 private:
+    
+   enum LinkChannelState
+    {          
+       NO_CHANNEL_CONNECTED,
+       EXTERNAL_CHANNEL_COMMAND,
+       EXTERNAL_SEND_CHANNEL_REQ,
+       EXTERNAL_REC_CHANNEL_RESP,
+       EXTERNAL_SEND_CHANNEL_ACK,
+       EXTERNAL_REC_CHANNEL_REQ,
+       EXTERNAL_SEND_CHANNEL_RESP,
+       EXTERNAL_REC_CHANNEL_ACK,
+       INTERNAL_REC_CHANNEL_REQ,
+       INTERNAL_SEND_CHANNEL_RESP,
+       INTERNAL_REC_CHANNEL_ACK,
+       INTERNAL_SEND_CHANNEL_REQ,
+       INTERNAL_REC_CHANNEL_RESP,
+       INTERNAL_SEND_CHANNEL_ACK
+    };
+
+    
+    LinkChannelState m_state;
+    
+    virtual void SetState (LinkChannelState state);
+    //virtual LinkChannelState GetState (void) const;
+
 
   /**
    * \brief Assign operator
@@ -316,7 +388,11 @@ private:
    * The PointToPointChannel to which this PointToPointNetDevice has been
    * attached.
    */
-  Ptr<PointToPointChannel> m_channel;
+  //Ptr<PointToPointChannel> m_channel;
+  Ptr<PointToPointChannelUni> m_channel;
+  Ptr<PointToPointChannelUni> m_channelRx;
+
+
 
   /**
    * The Queue which this PointToPointNetDevice uses as a packet source.
@@ -330,6 +406,8 @@ private:
    * Error model for receive packet events
    */
   Ptr<ErrorModel> m_receiveErrorModel;
+  uint32_t m_linkchannelRx;
+  uint32_t m_linkchannelTx;
 
   /**
    * The trace source fired when packets come into the "top" of the device
@@ -475,6 +553,20 @@ private:
    * \return The corresponding PPP protocol number
    */
   static uint16_t EtherToPpp (uint16_t protocol);
+  
+   EventId m_watingChannelRespEvent;
+   EventId m_watingChannelConfEvent;
+   EventId m_WaitChannelEvent;
+   EventId m_SendChannelRequestPacketEvent;
+   EventId m_SendChannelResponsePacketEvent;
+   EventId m_watingChannelForwardEvent;
+   Ptr< UniformRandomVariable > m_rng;
+   uint8_t m_type;
+   uint8_t m_channel0_used;
+   uint8_t m_channel1_used;
+   Mac48Address m_destAddress;
+   uint32_t m_packetId;
+   uint32_t m_ackid;
 };
 
 } // namespace ns3

@@ -22,7 +22,8 @@
 #include "ns3/log.h"
 #include "ns3/simulator.h"
 #include "ns3/point-to-point-net-device.h"
-#include "ns3/point-to-point-channel.h"
+//#include "ns3/point-to-point-channel.h"
+#include "ns3/point-to-point-channel-uni.h"
 #include "ns3/point-to-point-remote-channel.h"
 #include "ns3/queue.h"
 #include "ns3/config.h"
@@ -34,6 +35,8 @@
 #include "ns3/trace-helper.h"
 #include "point-to-point-helper.h"
 
+#include <algorithm>    // std::find
+
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("PointToPointHelper");
@@ -43,6 +46,7 @@ PointToPointHelper::PointToPointHelper ()
   m_queueFactory.SetTypeId ("ns3::DropTailQueue");
   m_deviceFactory.SetTypeId ("ns3::PointToPointNetDevice");
   m_channelFactory.SetTypeId ("ns3::PointToPointChannel");
+  m_channelUniFactory.SetTypeId ("ns3::PointToPointChannelUni");
   m_remoteChannelFactory.SetTypeId ("ns3::PointToPointRemoteChannel");
 }
 
@@ -70,6 +74,7 @@ void
 PointToPointHelper::SetChannelAttribute (std::string n1, const AttributeValue &v1)
 {
   m_channelFactory.Set (n1, v1);
+  m_channelUniFactory.Set (n1, v1);
   m_remoteChannelFactory.Set (n1, v1);
 }
 
@@ -240,7 +245,8 @@ PointToPointHelper::Install (Ptr<Node> a, Ptr<Node> b)
   // (rank), and the rank is the same as this instance.  If both are true, 
   //use a normal p2p channel, otherwise use a remote channel
   bool useNormalChannel = true;
-  Ptr<PointToPointChannel> channel = 0;
+  //Ptr<PointToPointChannel> channel = 0;
+  Ptr<PointToPointChannelUni> channel = 0;
 
   if (MpiInterface::IsEnabled ())
     {
@@ -251,12 +257,14 @@ PointToPointHelper::Install (Ptr<Node> a, Ptr<Node> b)
         {
           useNormalChannel = false;
         }
+      NS_LOG_UNCOND ("MpiInterface::IsEnabled");
     }
   if (useNormalChannel)
     {
-      channel = m_channelFactory.Create<PointToPointChannel> ();
+      //channel = m_channelFactory.Create<PointToPointChannel> ();
+      channel = m_channelUniFactory.Create<PointToPointChannelUni> ();
     }
-  else
+  /*else
     {
       channel = m_remoteChannelFactory.Create<PointToPointRemoteChannel> ();
       Ptr<MpiReceiver> mpiRecA = CreateObject<MpiReceiver> ();
@@ -265,7 +273,7 @@ PointToPointHelper::Install (Ptr<Node> a, Ptr<Node> b)
       mpiRecB->SetReceiveCallback (MakeCallback (&PointToPointNetDevice::Receive, devB));
       devA->AggregateObject (mpiRecA);
       devB->AggregateObject (mpiRecB);
-    }
+    } */
 
   devA->Attach (channel);
   devB->Attach (channel);
@@ -274,6 +282,134 @@ PointToPointHelper::Install (Ptr<Node> a, Ptr<Node> b)
 
   return container;
 }
+
+NetDeviceContainer 
+PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
+{
+  //NetDeviceContainer container;
+  std::cout << ".................InstallUni : a  " << a->GetId () << ", b " <<  b->GetId () << '\n';
+
+    
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
+  if (m_nodeListIterator != m_nodeList.end())
+    {
+     //Ptr<PointToPointNetDevice> devATemp;
+     //devATemp = m_nodeDeviceMap.find (a->GetId ())->second;
+     devA  = m_nodeDeviceMap.find (a->GetId ())->second;
+     //std::cout << "...node a already in the list : " << devATemp->GetAddress ()<< '\n';
+     std::cout << "...node a already in the list : " << devA->GetAddress ()<< '\n';
+    }
+  else
+    {
+     std::cout << "...node a not in the list : \n";
+     
+     devA = m_deviceFactory.Create<PointToPointNetDevice> ();
+     devA->SetAddress (Mac48Address::Allocate ());
+     a->AddDevice (devA);
+     m_nodeDeviceMap[a->GetId ()] = devA;
+     std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
+     Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+     devA->SetQueue (queueA);
+    }
+  
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
+  if (m_nodeListIterator != m_nodeList.end())
+    {
+     //devB = b->GetDevice(0);
+     devB  = m_nodeDeviceMap.find (b->GetId ())->second;
+     std::cout << "...node b already in the list : " << devB->GetAddress () << '\n';
+    }
+  else
+    {
+     std::cout << "....node b not in the list : \n";
+     
+     devB = m_deviceFactory.Create<PointToPointNetDevice> ();
+     devB->SetAddress (Mac48Address::Allocate ());
+     b->AddDevice (devB);
+     m_nodeDeviceMap[b->GetId ()] = devB;
+     std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
+     Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+     devB->SetQueue (queueA);
+    }
+
+  //Ptr<PointToPointNetDevice> devA = m_deviceFactory.Create<PointToPointNetDevice> ();
+  /*devA =  m_deviceFactory.Create<PointToPointNetDevice> ();
+  devA->SetAddress (Mac48Address::Allocate ());
+  a->AddDevice (devA);
+  Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+  devA->SetQueue (queueA); */
+  //Ptr<PointToPointNetDevice> devB = m_deviceFactory.Create<PointToPointNetDevice> ();
+  /*devB = m_deviceFactory.Create<PointToPointNetDevice> ();
+  devB->SetAddress (Mac48Address::Allocate ());
+  b->AddDevice (devB);
+  Ptr<Queue> queueB = m_queueFactory.Create<Queue> ();
+  devB->SetQueue (queueB); */
+  // If MPI is enabled, we need to see if both nodes have the same system id 
+  // (rank), and the rank is the same as this instance.  If both are true, 
+  //use a normal p2p channel, otherwise use a remote channel
+  bool useNormalChannel = true;
+  //Ptr<PointToPointChannel> channel = 0;
+  Ptr<PointToPointChannelUni> channel = 0;
+
+  if (MpiInterface::IsEnabled ())
+    {
+      uint32_t n1SystemId = a->GetSystemId ();
+      uint32_t n2SystemId = b->GetSystemId ();
+      uint32_t currSystemId = MpiInterface::GetSystemId ();
+      if (n1SystemId != currSystemId || n2SystemId != currSystemId) 
+        {
+          useNormalChannel = false;
+        }
+      NS_LOG_UNCOND ("MpiInterface::IsEnabled");
+    }
+  if (useNormalChannel)
+    {
+      //channel = m_channelFactory.Create<PointToPointChannel> ();
+      channel = m_channelUniFactory.Create<PointToPointChannelUni> ();
+    }
+  /*else
+    {
+      channel = m_remoteChannelFactory.Create<PointToPointRemoteChannel> ();
+      Ptr<MpiReceiver> mpiRecA = CreateObject<MpiReceiver> ();
+      Ptr<MpiReceiver> mpiRecB = CreateObject<MpiReceiver> ();
+      mpiRecA->SetReceiveCallback (MakeCallback (&PointToPointNetDevice::Receive, devA));
+      mpiRecB->SetReceiveCallback (MakeCallback (&PointToPointNetDevice::Receive, devB));
+      devA->AggregateObject (mpiRecA);
+      devB->AggregateObject (mpiRecB);
+    } */
+
+  devA->Attach (channel, 0); //0 transmitter
+  devB->Attach (channel, 1); //1 receiver 
+  
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
+  if (m_nodeListIterator != m_nodeList.end())
+    {
+     //std::cout << "===node a already in the list : " << *m_nodeListIterator << '\n';
+    }
+  else
+    {
+     //std::cout << "===node a not in the list : \n";
+     
+     m_nodeList.push_back(a);
+     m_containerUni.Add (devA);
+    }
+  
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
+  if (m_nodeListIterator != m_nodeList.end())
+    {
+     //std::cout << "===node b already in the list : " << *m_nodeListIterator << '\n';
+    }
+  else
+    {
+     //std::cout << "===node b not in the list : \n";
+     
+     m_nodeList.push_back(b);
+     m_containerUni.Add (devB);
+    }
+  
+  return m_containerUni;
+}
+
 
 NetDeviceContainer 
 PointToPointHelper::Install (Ptr<Node> a, std::string bName)
