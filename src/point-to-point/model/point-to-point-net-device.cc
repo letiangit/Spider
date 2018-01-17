@@ -27,7 +27,6 @@
 #include "ns3/pointer.h"
 #include "point-to-point-net-device.h"
 #include "point-to-point-channel.h"
-#include "point-to-point-channel-uni.h"
 #include "ppp-header.h"
 
 namespace ns3 {
@@ -359,7 +358,7 @@ PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch)
 
 
 bool
-PointToPointNetDevice::Attach (Ptr<PointToPointChannelUni> ch)
+PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch)
 {
   NS_LOG_FUNCTION (this << &ch);
   m_channel = ch;
@@ -376,7 +375,7 @@ PointToPointNetDevice::Attach (Ptr<PointToPointChannelUni> ch)
 }
 
 bool
-PointToPointNetDevice::Attach (Ptr<PointToPointChannelUni> ch, uint8_t rx)
+PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch, uint8_t rx)
 {
 
   NS_LOG_FUNCTION (this << &ch);

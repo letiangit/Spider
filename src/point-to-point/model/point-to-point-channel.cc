@@ -57,10 +57,24 @@ PointToPointChannel::PointToPointChannel()
   :
     Channel (),
     m_delay (Seconds (0.)),
+    m_channelUni (false),
     m_nDevices (0)
 {
   NS_LOG_FUNCTION_NOARGS ();
 }
+
+/*
+void
+PointToPointChannel::AttachSender (Ptr<PointToPointNetDevice> device)
+{
+  NS_LOG_FUNCTION (this << device);
+  NS_ASSERT_MSG (m_nDevices == 0, "Only 1 sender devices permitted");
+  NS_ASSERT (device != 0);
+  m_link[0].m_src = device;
+  m_nDevices++;
+}
+ */ 
+
 
 void
 PointToPointChannel::Attach (Ptr<PointToPointNetDevice> device)
@@ -68,19 +82,31 @@ PointToPointChannel::Attach (Ptr<PointToPointNetDevice> device)
   NS_LOG_FUNCTION (this << device);
   NS_ASSERT_MSG (m_nDevices < N_DEVICES, "Only two devices permitted");
   NS_ASSERT (device != 0);
-
-  m_link[m_nDevices++].m_src = device;
-//
-// If we have both devices connected to the channel, then finish introducing
-// the two halves and set the links to IDLE.
-//
-  if (m_nDevices == N_DEVICES)
+  
+  if (IsChannelUni () )
     {
-      m_link[0].m_dst = m_link[1].m_src;
-      m_link[1].m_dst = m_link[0].m_src;
-      m_link[0].m_state = IDLE;
-      m_link[1].m_state = IDLE;
-    }
+    if (m_nDevices == 0)
+        {
+           m_link[0].m_src = device;
+        }
+      else
+        {
+           m_link[0].m_dst = device;
+           m_link[0].m_state = IDLE;
+       }
+     m_nDevices++;
+  }
+ else
+  {
+     m_link[m_nDevices++].m_src = device;
+     if (m_nDevices == N_DEVICES)
+      {
+         m_link[0].m_dst = m_link[1].m_src;
+         m_link[1].m_dst = m_link[0].m_src;
+         m_link[0].m_state = IDLE;
+         m_link[1].m_state = IDLE;
+       }    
+  }
 }
 
 bool
@@ -91,18 +117,39 @@ PointToPointChannel::TransmitStart (
 {
   NS_LOG_FUNCTION (this << p << src);
   NS_LOG_LOGIC ("UID is " << p->GetUid () << ")");
+  if (IsChannelUni () )
+    {
+        NS_ASSERT (m_link[0].m_state != INITIALIZING);
+        NS_LOG_UNCOND ("src " << src->GetAddress () );
+        NS_LOG_UNCOND ("src " << m_link[0].m_src->GetAddress () );
+        NS_LOG_UNCOND ("dst " << m_link[0].m_dst->GetAddress () );
 
-  NS_ASSERT (m_link[0].m_state != INITIALIZING);
-  NS_ASSERT (m_link[1].m_state != INITIALIZING);
+        NS_ASSERT_MSG (src == m_link[0].m_src, "incorrect sender");
 
-  uint32_t wire = src == m_link[0].m_src ? 0 : 1;
-  m_link[wire].m_channel = tx_linkchannel;
-  Simulator::ScheduleWithContext (m_link[wire].m_dst->GetNode ()->GetId (),
+        //uint32_t wire = src == m_link[0].m_src ? 0 : 1;
+        uint32_t wire = 0;
+         m_link[wire].m_channel = tx_linkchannel;
+        Simulator::ScheduleWithContext (m_link[wire].m_dst->GetNode ()->GetId (),
                                   txTime + m_delay, &PointToPointNetDevice::ReceiveChannel,
                                   m_link[wire].m_dst, p, m_link[wire].m_channel);
 
-  // Call the tx anim callback on the net device
-  m_txrxPointToPoint (p, src, m_link[wire].m_dst, txTime, txTime + m_delay);
+        // Call the tx anim callback on the net device
+        m_txrxPointToPoint (p, src, m_link[wire].m_dst, txTime, txTime + m_delay);
+    }
+  else
+    {
+        NS_ASSERT (m_link[0].m_state != INITIALIZING);
+        NS_ASSERT (m_link[1].m_state != INITIALIZING);
+
+        uint32_t wire = src == m_link[0].m_src ? 0 : 1;
+        m_link[wire].m_channel = tx_linkchannel;
+        Simulator::ScheduleWithContext (m_link[wire].m_dst->GetNode ()->GetId (),
+                                  txTime + m_delay, &PointToPointNetDevice::ReceiveChannel,
+                                  m_link[wire].m_dst, p, m_link[wire].m_channel);
+
+        // Call the tx anim callback on the net device
+        m_txrxPointToPoint (p, src, m_link[wire].m_dst, txTime, txTime + m_delay); 
+    }
   return true;
 }
 
@@ -118,7 +165,21 @@ PointToPointChannel::GetPointToPointDevice (uint32_t i) const
 {
   NS_LOG_FUNCTION_NOARGS ();
   NS_ASSERT (i < 2);
-  return m_link[i].m_src;
+if (IsChannelUni () )
+ {
+  if (i ==0)
+    {
+      return m_link[0].m_src;
+    }
+  else
+    {
+      return m_link[0].m_dst;
+    }  
+ }
+else
+ {
+    return m_link[i].m_src; 
+ }
 }
 
 Ptr<NetDevice>
@@ -137,28 +198,55 @@ PointToPointChannel::GetDelay (void) const
 Ptr<PointToPointNetDevice>
 PointToPointChannel::GetSource (uint32_t i) const
 {
+  if (IsChannelUni () )
+  {
+    NS_ASSERT_MSG (i == 0, "incorrect GetSource");  
+  }
   return m_link[i].m_src;
 }
 
 Ptr<PointToPointNetDevice>
 PointToPointChannel::GetDestination (uint32_t i) const
 {
+  if (IsChannelUni () )
+  {
+    NS_ASSERT_MSG (i == 0, "incorrect GetSource");  
+  } 
   return m_link[i].m_dst;
 }
 
 bool
 PointToPointChannel::IsInitialized (void) const
 {
-  NS_ASSERT (m_link[0].m_state != INITIALIZING);
-  NS_ASSERT (m_link[1].m_state != INITIALIZING);
+ if (IsChannelUni () )
+   {
+     NS_ASSERT (m_link[0].m_state != INITIALIZING);
+     //NS_ASSERT (m_link[1].m_state != INITIALIZING);
+   }
+  else
+   {
+     NS_ASSERT (m_link[0].m_state != INITIALIZING);
+     NS_ASSERT (m_link[1].m_state != INITIALIZING);      
+   }
   return true;
 }
 
 uint32_t
 PointToPointChannel::GetLinkChannel (uint32_t i) const
 {
+ if (IsChannelUni () )
+  {
+    NS_ASSERT_MSG (i == 0, "incorrect GetSource");  
+  } 
   return m_link[i].m_channel;
 }
+
+bool 
+PointToPointChannel::IsChannelUni (void) const
+{
+    return m_channelUni;
+}
+
 
 
 } // namespace ns3

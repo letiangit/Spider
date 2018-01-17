@@ -70,6 +70,9 @@ public:
    * \param device pointer to the netdevice to attach to the channel
    */
   void Attach (Ptr<PointToPointNetDevice> device);
+    //void AttachSender (Ptr<PointToPointNetDevice> device);
+    //void AttachReceiver (Ptr<PointToPointNetDevice> device);
+
 
   /**
    * \brief Transmit a packet over this channel
@@ -99,6 +102,8 @@ public:
    * \returns Ptr to NetDevice requested
    */
   virtual Ptr<NetDevice> GetDevice (uint32_t i) const;
+  
+  virtual bool  IsChannelUni (void) const;
 
 protected:
   /**
@@ -147,10 +152,11 @@ protected:
                     
 private:
   /** Each point to point link has exactly two net devices. */
-  static const int N_DEVICES = 2;
+  static const int N_DEVICES = 2; // 3 device for unidirectional link
 
   Time          m_delay;    //!< Propagation delay
   int32_t       m_nDevices; //!< Devices of this channel
+  bool          m_channelUni;
 
   /**
    * The trace source for the packet transmission animation events that the 

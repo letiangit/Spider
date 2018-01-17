@@ -47,7 +47,6 @@ const uint32_t backoffcounter = 20;
 
 class Queue;
 class PointToPointChannel;
-class PointToPointChannelUni;
 class ErrorModel;
 class UniformRandomVariable;
 
@@ -133,8 +132,8 @@ public:
    * \return true if the operation was successfull (always true actually)
    */
   //bool Attach (Ptr<PointToPointChannel> ch);
-  bool Attach (Ptr<PointToPointChannelUni> ch);
-  bool Attach (Ptr<PointToPointChannelUni> ch, uint8_t rx);
+  bool Attach (Ptr<PointToPointChannel> ch);
+  bool Attach (Ptr<PointToPointChannel> ch, uint8_t rx);
 
 
   /**
@@ -389,8 +388,8 @@ private:
    * attached.
    */
   //Ptr<PointToPointChannel> m_channel;
-  Ptr<PointToPointChannelUni> m_channel;
-  Ptr<PointToPointChannelUni> m_channelRx;
+  Ptr<PointToPointChannel> m_channel;
+  Ptr<PointToPointChannel> m_channelRx;
 
 
 

@@ -22,8 +22,7 @@
 #include "ns3/log.h"
 #include "ns3/simulator.h"
 #include "ns3/point-to-point-net-device.h"
-//#include "ns3/point-to-point-channel.h"
-#include "ns3/point-to-point-channel-uni.h"
+#include "ns3/point-to-point-channel.h"
 #include "ns3/point-to-point-remote-channel.h"
 #include "ns3/queue.h"
 #include "ns3/config.h"
@@ -46,7 +45,6 @@ PointToPointHelper::PointToPointHelper ()
   m_queueFactory.SetTypeId ("ns3::DropTailQueue");
   m_deviceFactory.SetTypeId ("ns3::PointToPointNetDevice");
   m_channelFactory.SetTypeId ("ns3::PointToPointChannel");
-  m_channelUniFactory.SetTypeId ("ns3::PointToPointChannelUni");
   m_remoteChannelFactory.SetTypeId ("ns3::PointToPointRemoteChannel");
 }
 
@@ -74,7 +72,6 @@ void
 PointToPointHelper::SetChannelAttribute (std::string n1, const AttributeValue &v1)
 {
   m_channelFactory.Set (n1, v1);
-  m_channelUniFactory.Set (n1, v1);
   m_remoteChannelFactory.Set (n1, v1);
 }
 
@@ -246,7 +243,7 @@ PointToPointHelper::Install (Ptr<Node> a, Ptr<Node> b)
   //use a normal p2p channel, otherwise use a remote channel
   bool useNormalChannel = true;
   //Ptr<PointToPointChannel> channel = 0;
-  Ptr<PointToPointChannelUni> channel = 0;
+  Ptr<PointToPointChannel> channel = 0;
 
   if (MpiInterface::IsEnabled ())
     {
@@ -262,7 +259,7 @@ PointToPointHelper::Install (Ptr<Node> a, Ptr<Node> b)
   if (useNormalChannel)
     {
       //channel = m_channelFactory.Create<PointToPointChannel> ();
-      channel = m_channelUniFactory.Create<PointToPointChannelUni> ();
+      channel = m_channelFactory.Create<PointToPointChannel> ();
     }
   /*else
     {
@@ -349,7 +346,7 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
   //use a normal p2p channel, otherwise use a remote channel
   bool useNormalChannel = true;
   //Ptr<PointToPointChannel> channel = 0;
-  Ptr<PointToPointChannelUni> channel = 0;
+  Ptr<PointToPointChannel> channel = 0;
 
   if (MpiInterface::IsEnabled ())
     {
@@ -365,7 +362,7 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
   if (useNormalChannel)
     {
       //channel = m_channelFactory.Create<PointToPointChannel> ();
-      channel = m_channelUniFactory.Create<PointToPointChannelUni> ();
+      channel = m_channelFactory.Create<PointToPointChannel> ();
     }
   /*else
     {
@@ -389,7 +386,6 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
   else
     {
      //std::cout << "===node a not in the list : \n";
-     
      m_nodeList.push_back(a);
      m_containerUni.Add (devA);
     }
@@ -402,11 +398,9 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
   else
     {
      //std::cout << "===node b not in the list : \n";
-     
      m_nodeList.push_back(b);
      m_containerUni.Add (devB);
     }
-  
   return m_containerUni;
 }
 
