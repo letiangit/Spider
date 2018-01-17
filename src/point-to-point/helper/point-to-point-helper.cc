@@ -281,6 +281,132 @@ PointToPointHelper::Install (Ptr<Node> a, Ptr<Node> b)
 }
 
 NetDeviceContainer 
+PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
+{
+  NetDeviceContainer container;
+  std::cout << ".................InstallBi : a  " << a->GetId () << ", b " <<  b->GetId () << '\n';
+
+    
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
+  if (m_nodeListIterator != m_nodeList.end())
+    {
+     devAFirst  = m_nodeDeviceMap.find (a->GetId ())->second;
+     std::cout << "...node a already in the list : " << devAFirst->GetAddress ()<< '\n';
+     devASecond = m_deviceFactory.Create<PointToPointNetDevice> ();
+     devASecond->SetAddress (Mac48Address::Allocate ());
+     a->AddDevice (devASecond);
+     m_nodeDeviceMap[a->GetId ()] = devASecond;
+     std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
+     Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+     devASecond->SetQueue (queueA);
+
+     //build connection between two device
+    }
+  else
+    {
+     std::cout << "...node a not in the list : \n";
+     
+     devAFirst = m_deviceFactory.Create<PointToPointNetDevice> ();
+     devAFirst->SetAddress (Mac48Address::Allocate ());
+     a->AddDevice (devAFirst);
+     m_nodeDeviceMap[a->GetId ()] = devAFirst;
+     std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
+     Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+     devAFirst->SetQueue (queueA);
+    }
+  
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
+  if (m_nodeListIterator != m_nodeList.end())
+    {
+     devBFirst  = m_nodeDeviceMap.find (b->GetId ())->second;
+     std::cout << "...node a already in the list : " << devBFirst->GetAddress ()<< '\n';
+     devBSecond = m_deviceFactory.Create<PointToPointNetDevice> ();
+     devBSecond->SetAddress (Mac48Address::Allocate ());
+     b->AddDevice (devBSecond);
+     m_nodeDeviceMap[a->GetId ()] = devBSecond;
+     std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
+     Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+     devBSecond->SetQueue (queueA);
+     //build connection between two device
+    }
+  else
+    {
+     std::cout << "...node b not in the list : \n";
+     
+     devBFirst = m_deviceFactory.Create<PointToPointNetDevice> ();
+     devBFirst->SetAddress (Mac48Address::Allocate ());
+     b->AddDevice (devBFirst);
+     m_nodeDeviceMap[b->GetId ()] = devBFirst;
+     std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
+     Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+     devBFirst->SetQueue (queueA);
+    }
+
+  bool useNormalChannel = true;
+  Ptr<PointToPointChannel> channel = 0;
+
+  if (MpiInterface::IsEnabled ())
+    {
+      uint32_t n1SystemId = a->GetSystemId ();
+      uint32_t n2SystemId = b->GetSystemId ();
+      uint32_t currSystemId = MpiInterface::GetSystemId ();
+      if (n1SystemId != currSystemId || n2SystemId != currSystemId) 
+        {
+          useNormalChannel = false;
+        }
+      NS_LOG_UNCOND ("MpiInterface::IsEnabled");
+    }
+  if (useNormalChannel)
+    {
+      //channel = m_channelFactory.Create<PointToPointChannel> ();
+      channel = m_channelFactory.Create<PointToPointChannel> ();
+    }
+  /*else
+    {
+      channel = m_remoteChannelFactory.Create<PointToPointRemoteChannel> ();
+      Ptr<MpiReceiver> mpiRecA = CreateObject<MpiReceiver> ();
+      Ptr<MpiReceiver> mpiRecB = CreateObject<MpiReceiver> ();
+      mpiRecA->SetReceiveCallback (MakeCallback (&PointToPointNetDevice::Receive, devA));
+      mpiRecB->SetReceiveCallback (MakeCallback (&PointToPointNetDevice::Receive, devB));
+      devA->AggregateObject (mpiRecA);
+      devB->AggregateObject (mpiRecB);
+    } */
+
+  
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
+  if (m_nodeListIterator != m_nodeList.end())
+    {
+     std::cout << "===node a already in the list : " << *m_nodeListIterator << '\n';
+     devASecond->Attach (channel);
+     container.Add (devASecond);
+    }
+  else
+    {
+     std::cout << "===node a not in the list : \n";
+     m_nodeList.push_back(a);
+     devAFirst->Attach (channel);
+     container.Add (devAFirst);
+    }
+  
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
+  if (m_nodeListIterator != m_nodeList.end())
+    {
+     std::cout << "===node b already in the list : " << *m_nodeListIterator << '\n';
+     devBSecond->Attach (channel);
+     container.Add (devBSecond);
+    }
+  else
+    {
+     std::cout << "===node b not in the list : \n";
+     container.Add (devBFirst);
+     m_nodeList.push_back(b);
+     devBFirst->Attach (channel);
+    }
+  return container;
+}
+
+
+NetDeviceContainer 
 PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
 {
   //NetDeviceContainer container;

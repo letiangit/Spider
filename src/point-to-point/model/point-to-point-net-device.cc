@@ -963,7 +963,6 @@ PointToPointNetDevice::IsBridge (void) const
 void 
 PointToPointNetDevice::TryToSetLinkChannel (void)
 {
-    
    NS_LOG_FUNCTION (this);
    
    switch (m_state)

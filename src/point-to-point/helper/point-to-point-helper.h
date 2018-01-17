@@ -130,6 +130,7 @@ public:
    */
   NetDeviceContainer Install (Ptr<Node> a, Ptr<Node> b);
   NetDeviceContainer InstallUni (Ptr<Node> a, Ptr<Node> b);
+  NetDeviceContainer InstallBi (Ptr<Node> a, Ptr<Node> b);
 
 
   /**
@@ -205,6 +206,12 @@ private:
   Ptr<PointToPointNetDevice> devA;
   Ptr<PointToPointNetDevice> devB;
   NetDeviceContainer m_containerUni;
+  
+  Ptr<PointToPointNetDevice> devAFirst;
+  Ptr<PointToPointNetDevice> devASecond;
+  
+  Ptr<PointToPointNetDevice> devBFirst;
+  Ptr<PointToPointNetDevice> devBSecond;
 };
 
 } // namespace ns3
