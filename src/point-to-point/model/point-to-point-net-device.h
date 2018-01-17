@@ -202,6 +202,7 @@ public:
   
   virtual void AddLinkChangeCallback (Callback<void> callback);
   virtual void TryToSetLinkChannel (void);
+  virtual void TryToSetLinkChannelFromInside (void);
 
   virtual bool IsBroadcast (void) const;
   virtual Address GetBroadcast (void) const;
@@ -225,6 +226,7 @@ public:
   virtual void SendChannelConf ();
   virtual void SendChannelRequestPacket (uint8_t counter);
   virtual void SendChannelResponsePacket (uint8_t counter);
+  virtual void AddDevice (Ptr<PointToPointNetDevice> dev);
 
 
 
@@ -573,6 +575,7 @@ private:
    Time ChannelWaiting_Interval; 
    uint32_t CCmax;
    uint32_t backoffcounter;
+   Ptr<PointToPointNetDevice> m_DevSameNode;
 
 
 

@@ -301,6 +301,8 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      devASecond->SetQueue (queueA);
 
      //build connection between two device
+     devAFirst->AddDevice (devASecond);
+     devASecond->AddDevice (devAFirst);
     }
   else
     {
@@ -328,6 +330,8 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
      devBSecond->SetQueue (queueA);
      //build connection between two device
+     devBFirst->AddDevice (devBSecond);
+     devBSecond->AddDevice (devBFirst);
     }
   else
     {

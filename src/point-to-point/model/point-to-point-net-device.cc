@@ -504,6 +504,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         {
            SendChannelRequest ();
         }
+        m_DevSameNode->TryToSetLinkChannelFromInside ();
         return;
       } 
 
@@ -960,6 +961,14 @@ PointToPointNetDevice::IsBridge (void) const
   return false;
 }
 
+void 
+PointToPointNetDevice::TryToSetLinkChannelFromInside (void)
+{
+    NS_LOG_UNCOND (GetAddress () << " receive channel command from another nodes");
+    TryToSetLinkChannel ();
+}
+
+  
 void 
 PointToPointNetDevice::TryToSetLinkChannel (void)
 {
@@ -1460,6 +1469,12 @@ PointToPointNetDevice::EtherToPpp (uint16_t proto)
     default: NS_ASSERT_MSG (false, "EtherToPpp PPP Protocol number not defined!");
     }
   return 0;
+}
+
+void
+PointToPointNetDevice::AddDevice (Ptr<PointToPointNetDevice> dev)
+{
+  m_DevSameNode = dev;
 }
 
 
