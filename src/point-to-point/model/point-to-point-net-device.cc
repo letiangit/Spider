@@ -602,7 +602,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         }
        else if (ppp.GetType () == CHANNELRESP)
         {
-           SetState (EXTERNAL_SEND_CHANNEL_ACK);
+           //SetState (EXTERNAL_SEND_CHANNEL_ACK);
            SendChannelACK (ppp.GetSourceAddre (), ppp.GetID ()); // external_internal_transfer
         }
       //0114, ack is ignored
@@ -1109,6 +1109,7 @@ PointToPointNetDevice::SendChannelRequest (void)
     
     if (m_state == EXTERNAL_REC_CHANNEL_ACK || m_state == INTERNAL_SEND_CHANNEL_ACK)
       {
+        //SendChannelRequestPacket (0);
         return;
       }
 
@@ -1123,8 +1124,8 @@ PointToPointNetDevice::SendChannelRequest (void)
         Simulator::Schedule (ChannelResp_delay_total, &PointToPointNetDevice::SendChannelRequest, this);
       }
     else
-     {
-         m_watingChannelRespEvent = Simulator::Schedule (ChannelResp_delay_total, &PointToPointNetDevice::SendChannelRequest, this);
+     {   
+        m_watingChannelRespEvent = Simulator::Schedule (ChannelResp_delay_total, &PointToPointNetDevice::SendChannelRequest, this);       
      }
 
 }

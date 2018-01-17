@@ -102,6 +102,8 @@ public:
    * \returns Ptr to NetDevice requested
    */
   virtual Ptr<NetDevice> GetDevice (uint32_t i) const;
+  
+  virtual bool  IsChannelUni (void) const;
 
 protected:
   /**
@@ -154,6 +156,7 @@ private:
 
   Time          m_delay;    //!< Propagation delay
   int32_t       m_nDevices; //!< Devices of this channel
+  bool          m_channelUni;
 
   /**
    * The trace source for the packet transmission animation events that the 
