@@ -22,6 +22,7 @@
 #include "ns3/packet.h"
 #include "ns3/simulator.h"
 #include "ns3/log.h"
+#include "ns3/boolean.h"
 
 namespace ns3 {
 
@@ -40,6 +41,10 @@ PointToPointChannel::GetTypeId (void)
                    TimeValue (Seconds (0)),
                    MakeTimeAccessor (&PointToPointChannel::m_delay),
                    MakeTimeChecker ())
+    .AddAttribute ("UniChannel", "Channel type (uni or bi)",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&PointToPointChannel::m_channelUni),
+                   MakeBooleanChecker ())
     .AddTraceSource ("TxRxPointToPoint",
                      "Trace source indicating transmission of packet "
                      "from the PointToPointChannel, used by the Animation "
@@ -246,7 +251,6 @@ PointToPointChannel::IsChannelUni (void) const
 {
     return m_channelUni;
 }
-
 
 
 } // namespace ns3

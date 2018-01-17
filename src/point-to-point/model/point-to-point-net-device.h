@@ -37,12 +37,12 @@ namespace ns3 {
 
 
     
-const uint32_t ChannelResp_delay = 21; // second
-const uint32_t ChannelConf_delay = 17; //
-const Time Channel_delay_packet = Seconds (1); // one packet
-const Time ChannelWaiting_Interval = Seconds (1); // 4  channel
-const uint32_t CCmin = 1 ;
-const uint32_t CCmax = 100;
+//const uint32_t ChannelResp_delay = 21; // second
+//const uint32_t ChannelConf_delay = 17; //
+//const Time Channel_delay_packet = Seconds (1); // one packet
+//const Time ChannelWaiting_Interval = Seconds (1); // 4  channel
+//const uint32_t CCmin = 1 ;
+//const uint32_t CCmax = 100;
 const uint32_t backoffcounter = 20;
 
 class Queue;
@@ -566,6 +566,17 @@ private:
    Mac48Address m_destAddress;
    uint32_t m_packetId;
    uint32_t m_ackid;
+   
+   uint32_t ChannelResp_delay; 
+   uint32_t ChannelConf_delay; 
+   Time Channel_delay_packet; 
+   Time ChannelWaiting_Interval; 
+   uint32_t CCmax;
+   uint32_t backoffcounter;
+
+
+
+
 };
 
 } // namespace ns3

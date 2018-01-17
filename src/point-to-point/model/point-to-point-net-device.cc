@@ -67,7 +67,29 @@ PointToPointNetDevice::GetTypeId (void)
                    TimeValue (Seconds (0.0)),
                    MakeTimeAccessor (&PointToPointNetDevice::m_tInterframeGap),
                    MakeTimeChecker ())
-
+    .AddAttribute ("ChannelResp_delay", "Time out for SendChannelRequest (seconds)",
+                   UintegerValue (21),
+                   MakeUintegerAccessor (&PointToPointNetDevice::ChannelResp_delay),
+                   MakeUintegerChecker<uint16_t> ())
+    .AddAttribute ("ChannelConf_delay", "Time out for SendChannelResponse (seconds)",
+                   UintegerValue (17),
+                   MakeUintegerAccessor (&PointToPointNetDevice::ChannelConf_delay),  
+                   MakeUintegerChecker<uint16_t> ())
+    .AddAttribute ("Channel_delay_packet", 
+                   "The time interval for sending packets during channel selection",
+                   TimeValue (Seconds (1.0)),
+                   MakeTimeAccessor (&PointToPointNetDevice::Channel_delay_packet),
+                   MakeTimeChecker ())     
+    .AddAttribute ("ChannelWaiting_Interval", 
+                   "Rx channel switch interval",
+                   TimeValue (Seconds (1.0)),
+                   MakeTimeAccessor (&PointToPointNetDevice::ChannelWaiting_Interval),
+                   MakeTimeChecker ())      
+    .AddAttribute ("backoffcounter", "backoff counter for restarting channel request",
+                   UintegerValue (20),
+                   MakeUintegerAccessor (&PointToPointNetDevice::backoffcounter),  
+                   MakeUintegerChecker<uint16_t> ())       
+          
     //
     // Transmit queueing discipline for the device which includes its own set
     // of trace hooks.
@@ -179,9 +201,8 @@ PointToPointNetDevice::PointToPointNetDevice ()
     m_channelRx (0),
     m_linkUp (false),
     m_linkchannelTx (0),
+    CCmax (100),
     //m_linkchannelRx (0),
-    //CCmin (0),
-    //CCmax (10),
     m_state (NO_CHANNEL_CONNECTED), //Initiation
     m_channel0_used (CHANNELNOTDEFINED),
     m_channel1_used (CHANNELNOTDEFINED),
@@ -192,7 +213,7 @@ PointToPointNetDevice::PointToPointNetDevice ()
   WaitChannel ();
   m_rng = CreateObject<UniformRandomVariable> ();
 
-  uint64_t delay = m_rng->GetInteger (CCmin, CCmax);
+  uint64_t delay = m_rng->GetInteger (1, CCmax);
   Simulator::Schedule (Seconds (delay), &PointToPointNetDevice::TryToSetLinkChannel, this);
 }
 
@@ -361,6 +382,7 @@ bool
 PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch)
 {
   NS_LOG_FUNCTION (this << &ch);
+  NS_ASSERT_MSG (!ch->IsChannelUni (), "incorrect channel type ");
   m_channel = ch;
   m_channel->Attach (this);
 
@@ -379,6 +401,7 @@ PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch, uint8_t rx)
 {
 
   NS_LOG_FUNCTION (this << &ch);
+  NS_ASSERT_MSG (ch->IsChannelUni (), "incorrect channel type ");
   if (rx == 0)
    {
         m_channel = ch;
