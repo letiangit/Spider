@@ -85,6 +85,8 @@ public:
 
     #define CHANNELNOTDEFINED 255
 
+    #define CHANNELNUMBER 4
+
   /**
    * \brief Get the TypeId
    *
@@ -133,7 +135,7 @@ public:
    */
   //bool Attach (Ptr<PointToPointChannel> ch);
   bool Attach (Ptr<PointToPointChannel> ch);
-  bool Attach (Ptr<PointToPointChannel> ch, uint8_t rx);
+  bool Attach (Ptr<PointToPointChannel> ch, uint16_t rx);
 
 
   /**
@@ -202,7 +204,9 @@ public:
   
   virtual void AddLinkChangeCallback (Callback<void> callback);
   virtual void TryToSetLinkChannel (void);
-  virtual void TryToSetLinkChannelFromInside (void);
+  virtual void TryToSetLinkChannelFromInside (uint32_t tx, uint32_t rx);
+  virtual void TryToSetLinkChannelExternal (void);
+  
 
   virtual bool IsBroadcast (void) const;
   virtual Address GetBroadcast (void) const;
@@ -217,15 +221,18 @@ public:
   virtual bool SendFrom (Ptr<Packet> packet, const Address& source, const Address& dest, uint16_t protocolNumber);
   virtual void SendChannelRequest (void);
   //virtual void SendChannelResponse ();
-  virtual void SendChannelResponse (Mac48Address dest, uint8_t channel0, uint8_t channel1);
+  virtual void SendChannelResponse (Mac48Address dest, uint16_t channel0, uint16_t channel1, bool timeout);
   virtual void SendChannelACK (Mac48Address dest, uint32_t packetid);
-  virtual void Forward (Ptr<Packet> packet, uint8_t count);
+  virtual void Forward (Ptr<Packet> packet, uint16_t count);
+  virtual void SetUsedChannelInside (uint32_t tx, uint32_t rx);
+  virtual void SetUsedChannelOutside (uint32_t tx, uint32_t rx);
 
 
 
-  virtual void SendChannelConf ();
-  virtual void SendChannelRequestPacket (uint8_t counter);
-  virtual void SendChannelResponsePacket (uint8_t counter);
+
+
+  virtual void SendChannelRequestPacket (uint16_t counter);
+  virtual void SendChannelResponsePacket (uint16_t counter);
   virtual void AddDevice (Ptr<PointToPointNetDevice> dev);
 
 
@@ -241,7 +248,7 @@ public:
 
   virtual void SetPromiscReceiveCallback (PromiscReceiveCallback cb);
   virtual bool SupportsSendFrom (void) const;
-  
+  virtual void  Cancel4Events ();
 
 protected:
   /**
@@ -562,9 +569,13 @@ private:
    EventId m_SendChannelResponsePacketEvent;
    EventId m_watingChannelForwardEvent;
    Ptr< UniformRandomVariable > m_rng;
-   uint8_t m_type;
-   uint8_t m_channel0_used;
-   uint8_t m_channel1_used;
+   uint16_t m_type;
+   //uint16_t m_channel0_used;
+   //uint16_t m_channel1_used;
+   uint16_t m_channel0_usedInside;
+   uint16_t m_channel1_usedInside;
+   uint16_t m_channel0_usedOutside;
+   uint16_t m_channel1_usedOutside;        
    Mac48Address m_destAddress;
    uint32_t m_packetId;
    uint32_t m_ackid;
@@ -576,9 +587,20 @@ private:
    uint32_t CCmax;
    uint32_t backoffcounter;
    Ptr<PointToPointNetDevice> m_DevSameNode;
+   Time m_SendChannelResponsePacketTime;
+   Time m_SendChannelRequestPacketTime;
+   
+   Time  m_watingChannelRespTime;  
+   Time  m_watingChannelConfTime; 
+   bool m_externalChSel;
 
-
-
+   
+   
+   typedef void (* ChannelSelectedCallback)
+    (const Mac48Address addr, const Time ts, const uint32_t rx,
+     const uint32_t tx);
+     
+    TracedCallback<Mac48Address, Time, uint32_t, uint32_t > m_channelSelected;
 
 };
 

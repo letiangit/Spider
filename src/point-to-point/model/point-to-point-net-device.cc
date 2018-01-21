@@ -28,6 +28,7 @@
 #include "point-to-point-net-device.h"
 #include "point-to-point-channel.h"
 #include "ppp-header.h"
+#include "ns3/boolean.h"
 
 namespace ns3 {
 
@@ -88,7 +89,11 @@ PointToPointNetDevice::GetTypeId (void)
     .AddAttribute ("backoffcounter", "backoff counter for restarting channel request",
                    UintegerValue (20),
                    MakeUintegerAccessor (&PointToPointNetDevice::backoffcounter),  
-                   MakeUintegerChecker<uint16_t> ())       
+                   MakeUintegerChecker<uint16_t> ())      
+    .AddAttribute ("StartChannelSelection", "channel selection is initiated by external command (true) or internal random backoff (false)",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&PointToPointNetDevice::m_externalChSel),
+                   MakeBooleanChecker ())
           
     //
     // Transmit queueing discipline for the device which includes its own set
@@ -189,6 +194,11 @@ PointToPointNetDevice::GetTypeId (void)
                      "attached to the device",
                      MakeTraceSourceAccessor (&PointToPointNetDevice::m_promiscSnifferTrace),
                      "ns3::Packet::TracedCallback")
+    .AddTraceSource ("ChannelSelected",
+                    "Channel has been successfully Selected"
+                    "The header of successfully transmitted packet",
+                    MakeTraceSourceAccessor (&PointToPointNetDevice::m_channelSelected),
+                    "ns3::PointToPointNetDevice::ChannelSelectedCallback")
   ;
   return tid;
 }
@@ -204,8 +214,10 @@ PointToPointNetDevice::PointToPointNetDevice ()
     CCmax (100),
     //m_linkchannelRx (0),
     m_state (NO_CHANNEL_CONNECTED), //Initiation
-    m_channel0_used (CHANNELNOTDEFINED),
-    m_channel1_used (CHANNELNOTDEFINED),
+    m_channel0_usedInside (CHANNELNOTDEFINED),
+    m_channel1_usedInside (CHANNELNOTDEFINED),
+    m_channel0_usedOutside (CHANNELNOTDEFINED),
+    m_channel1_usedOutside (CHANNELNOTDEFINED),
     m_packetId (0),
     m_currentPkt (0)
 {
@@ -214,12 +226,22 @@ PointToPointNetDevice::PointToPointNetDevice ()
   m_rng = CreateObject<UniformRandomVariable> ();
 
   uint64_t delay = m_rng->GetInteger (1, CCmax);
-  Simulator::Schedule (Seconds (delay), &PointToPointNetDevice::TryToSetLinkChannel, this);
+  Simulator::Schedule (Seconds (delay), &PointToPointNetDevice::TryToSetLinkChannelExternal, this);
 }
 
 PointToPointNetDevice::~PointToPointNetDevice ()
 {
   NS_LOG_FUNCTION (this);
+}
+
+void
+PointToPointNetDevice::TryToSetLinkChannelExternal ()
+{
+  NS_LOG_FUNCTION (this);
+  if (m_externalChSel)
+    {
+      TryToSetLinkChannel ();
+    }
 }
 
 void
@@ -230,7 +252,6 @@ PointToPointNetDevice::AddHeader (Ptr<Packet> p, uint16_t protocolNumber)
   ppp.SetProtocol (EtherToPpp (protocolNumber));
   ppp.SetType (m_type);
   ppp.SetSourceAddre (Mac48Address::ConvertFrom (GetAddress ()));
-  NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " add header to " << m_destAddress);
   ppp.SetDestAddre (m_destAddress);
   NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " add header to " << m_destAddress);
   if (m_type != CHANNELACK)
@@ -245,8 +266,8 @@ PointToPointNetDevice::AddHeader (Ptr<Packet> p, uint16_t protocolNumber)
   
   if (m_type == CHANNELREQ)
    {
-      ppp.SetUsedChannel0 (m_channel0_used);
-      ppp.SetUsedChannel1 (m_channel1_used);
+      ppp.SetUsedChannel0 (m_channel0_usedInside);
+      ppp.SetUsedChannel1 (m_channel0_usedInside);
    }
   
   p->AddHeader (ppp);
@@ -397,7 +418,7 @@ PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch)
 }
 
 bool
-PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch, uint8_t rx)
+PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch, uint16_t rx)
 {
 
   NS_LOG_FUNCTION (this << &ch);
@@ -449,26 +470,44 @@ PointToPointNetDevice::SetReceiveErrorModel (Ptr<ErrorModel> em)
 void
 PointToPointNetDevice::WaitChannel ()
 {
+  uint16_t repetition = 0;  
+  while (1)
+   {
+    if (repetition == CHANNELNUMBER)
+     {
+        NS_LOG_UNCOND (GetAddress ()  <<  " no available rx channel...... "); 
+     }
     m_linkchannelRx++;
-    m_linkchannelRx = m_linkchannelRx % 4; 
-    m_WaitChannelEvent = Simulator::Schedule (ChannelWaiting_Interval, &PointToPointNetDevice::WaitChannel, this);
+    m_linkchannelRx = m_linkchannelRx % CHANNELNUMBER; 
+    
+    uint16_t channel= m_linkchannelRx;
+    if (channel != m_channel0_usedInside  ) // && channel != m_linkchannelTx 
+      {
+        //NS_LOG_UNCOND (GetAddress ()  <<  " WaitChannel " << m_linkchannelRx); 
+        break;
+      }
+    repetition++;
+   }
+   m_WaitChannelEvent = Simulator::Schedule (ChannelWaiting_Interval, &PointToPointNetDevice::WaitChannel, this);
 }
 
 
 void
 PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
 {
-  NS_LOG_UNCOND (GetAddress () << "..received linkchannel " << linkchannel << ", m_linkchannelRx " << m_linkchannelRx);  
-   if (linkchannel != m_linkchannelRx)
-     {
-        NS_LOG_UNCOND ("packet can not be recevied since sender and receiver are not in the same link channel");  
-        return;
-     }
-   //mimic the real link channel     
-   m_WaitChannelEvent.Cancel ();
-   m_linkchannelRx = linkchannel; // in case m_linkchannelRx changes during Cancelling.
-
-           
+  //NS_LOG_UNCOND ("add m_phyRxEndTrace " );  
+  m_phyRxEndTrace (packet);
+  NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << "..received linkchannel " << linkchannel << ", m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx);  
+  if (m_channel->IsChannelUni())
+    {
+      NS_ASSERT (m_channel0_usedInside == CHANNELNOTDEFINED);
+      NS_ASSERT (m_channel1_usedInside == CHANNELNOTDEFINED);
+      NS_ASSERT (m_channel0_usedOutside == CHANNELNOTDEFINED);
+      NS_ASSERT (m_channel1_usedOutside == CHANNELNOTDEFINED);
+    }
+  //NS_LOG_UNCOND (m_channel0_usedInside << "\t " << m_channel1_usedInside << "\t" << m_channel0_usedOutside << "\t" << m_channel1_usedOutside) ;
+  
+  
     PppHeader ppp;
     packet->PeekHeader (ppp);
     
@@ -480,6 +519,27 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
             break;
         }
     }
+  
+   if (linkchannel != m_linkchannelRx)
+     {
+        NS_LOG_UNCOND ("packet can not be recevied since sender and receiver are not in the same link channel");  
+        return;
+     }
+   //mimic the real link channel   
+   if (m_WaitChannelEvent.IsRunning())
+    {
+        m_WaitChannelEvent.Cancel ();
+        if (m_linkchannelRx == m_linkchannelTx || m_linkchannelRx == m_channel0_usedInside)
+            {
+                NS_ASSERT (m_state == NO_CHANNEL_CONNECTED || m_state == EXTERNAL_SEND_CHANNEL_REQ);
+                NS_LOG_UNCOND ("restart channel request since tx channel " << m_linkchannelTx << " is used by rx " << m_linkchannelRx << ", or m_channel0_usedInside " << m_channel0_usedInside );  
+                ChangeTxChannel ();
+                //SetState (NO_CHANNEL_CONNECTED);
+                //TryToSetLinkChannel ();
+            }
+    }
+   m_linkchannelRx = linkchannel; // in case m_linkchannelRx changes during Cancelling.
+
     
     if (ppp.GetType () == CHANNELRESP  && ppp.GetDestAddre () != Mac48Address::ConvertFrom (GetAddress() ) )
       {
@@ -491,10 +551,11 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
     if (m_state == EXTERNAL_REC_CHANNEL_ACK || m_state == INTERNAL_SEND_CHANNEL_ACK)
       {
         NS_LOG_UNCOND (GetAddress ()  <<  "drop packet since channel is already selected " );
-        //0114, ack is ignored
+        
        if (ppp.GetType () == CHANNELREQ)
         {
-           SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+           SetUsedChannelOutside (ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+           SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1(), false);
         }
        else if (ppp.GetType () == CHANNELRESP)
         {
@@ -502,9 +563,11 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         }
        else if (ppp.GetType () == CHANNELACK)
         {
-           SendChannelRequest ();
+            //SendChannelRequest ();
+            NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " start channel request " );
+            SendChannelRequestPacket (0);
         }
-        m_DevSameNode->TryToSetLinkChannelFromInside ();
+        
         return;
       } 
 
@@ -516,9 +579,15 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         {
            SetState (INTERNAL_REC_CHANNEL_REQ);
            SetState (INTERNAL_SEND_CHANNEL_RESP);
-           NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelResponse NO_CHANNEL_CONNECTED " );  
-           SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+           SetUsedChannelOutside (ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+           NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelResponse, INTERNAL_SEND_CHANNEL_RESP " ); 
+          SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1(), true);
         }
+      else
+       {
+          NS_ASSERT ("no correct packets or state");
+       }
+            
        return;
    }
        
@@ -532,16 +601,28 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
            {
                SetState (EXTERNAL_REC_CHANNEL_RESP);
                SetState (EXTERNAL_SEND_CHANNEL_ACK);
+               NS_LOG_UNCOND (GetAddress ()  <<  " EXTERNAL_SEND_CHANNEL_ACK,  channel nearly selected, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
                NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelACK " );  
                SendChannelACK (ppp.GetSourceAddre (), ppp.GetID ());
            }
         }
        else if (ppp.GetType () == CHANNELREQ )
         {
+           if ( m_watingChannelRespEvent.IsRunning() )
+            {
+                NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelRespEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelRespEvent));
+                m_watingChannelRespEvent.Cancel ();
+            }
+           
+           if ( m_SendChannelRequestPacketEvent.IsRunning() )
+            {
+                m_SendChannelRequestPacketEvent.Cancel ();
+            }
            SetState (INTERNAL_REC_CHANNEL_REQ);
            SetState (INTERNAL_SEND_CHANNEL_RESP);
+           SetUsedChannelOutside (ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
            NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelResponse " );  
-           SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+           SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1(), true);
         } 
       return;
     }
@@ -554,17 +635,19 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         {
            SetState (EXTERNAL_REC_CHANNEL_REQ);
            SetState (EXTERNAL_SEND_CHANNEL_RESP);
-           NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelResponse EXTERNAL_SEND_CHANNEL_ACK" );  
-           SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+           SetUsedChannelOutside (ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+           NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelResponse EXTERNAL_SEND_CHANNEL_ACK" ); 
+           SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1(), false);
         }
-       //0114, ack is ignored
        else if (ppp.GetType () == CHANNELRESP)
         {
            SendChannelACK (ppp.GetSourceAddre (), ppp.GetID ()); // external_internal_transfer
         }
        else if (ppp.GetType () == CHANNELACK)
         {
-           SendChannelRequest ();
+           //SendChannelRequest ();
+           NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " start channel request " );
+           SendChannelRequestPacket (0);
         }
        return;          
     }
@@ -576,35 +659,19 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
        if (ppp.GetType () == CHANNELACK)
          {
            SetState (EXTERNAL_REC_CHANNEL_ACK);
-           NS_LOG_UNCOND (GetAddress ()  <<  " set EXTERNAL_REC_CHANNEL_ACK, CHANNEL SELECTED" );  
-
-            if ( m_watingChannelConfEvent.IsRunning ())
-             {
-               NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelConfEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelConfEvent));
-               m_watingChannelConfEvent.Cancel ();
-               NS_LOG_UNCOND ("IsExpired " <<  m_watingChannelConfEvent.IsExpired ());  
-             }
-            if ( m_watingChannelRespEvent.IsRunning ())
-             {
-               NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelRespEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelRespEvent));
-               m_watingChannelRespEvent.Cancel ();
-               NS_LOG_UNCOND ("IsExpired " <<  m_watingChannelRespEvent.IsExpired ());  
-             }
-            
-           if ( m_SendChannelResponsePacketEvent.IsRunning() )
-             {
-               m_SendChannelResponsePacketEvent.Cancel ();
-             }
-            
-          if ( m_SendChannelRequestPacketEvent.IsRunning() )
-             {
-               m_SendChannelRequestPacketEvent.Cancel ();
-             }
+           NS_LOG_UNCOND (GetAddress ()  <<  " set EXTERNAL_REC_CHANNEL_ACK, CHANNEL SELECTED, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
+           m_channelSelected (Mac48Address::ConvertFrom(GetAddress ()), Simulator::Now (), m_linkchannelRx, m_linkchannelTx);
+           m_phyTxBeginTrace (packet);
+           Cancel4Events ();
+           if (! m_channel->IsChannelUni())
+           {
+             m_DevSameNode->TryToSetLinkChannelFromInside (m_linkchannelTx, m_linkchannelRx);
+           }
           }
-       //0114, ack is ignored
        else  if (ppp.GetType () == CHANNELREQ)
         {
-             SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+             SetUsedChannelOutside (ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+             SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1(), false);
         }
        else  if (ppp.GetType () == CHANNELRESP)
         {
@@ -620,18 +687,21 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         {
            SetState (INTERNAL_REC_CHANNEL_ACK);
            SetState (INTERNAL_SEND_CHANNEL_REQ);
-           NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelRequest " );  
-           SendChannelRequest ();
+           NS_LOG_UNCOND (GetAddress ()  <<  " INTERNAL_SEND_CHANNEL_REQ,  channel nearly selected, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
+
+           //SendChannelRequest ();
+           NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " start channel request " );
+           SendChannelRequestPacket (0);
         }
        else if (ppp.GetType () == CHANNELRESP)
         {
            //SetState (EXTERNAL_SEND_CHANNEL_ACK);
            SendChannelACK (ppp.GetSourceAddre (), ppp.GetID ()); // external_internal_transfer
         }
-      //0114, ack is ignored
       else if (ppp.GetType () == CHANNELREQ)
         {
-            SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+            SetUsedChannelOutside (ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+            SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1(), false);
         }
       return;      
     }
@@ -643,144 +713,70 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         {
            SetState (INTERNAL_REC_CHANNEL_RESP);
            SetState (INTERNAL_SEND_CHANNEL_ACK);
-           NS_LOG_UNCOND (GetAddress ()  <<  " set INTERNAL_SEND_CHANNEL_ACK, CHANNEL SELECTED" );  
-           NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelACK " );  
-            if ( m_watingChannelConfEvent.IsRunning ())
-             {
-               NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelConfEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelConfEvent));
-               m_watingChannelConfEvent.Cancel ();
-               NS_LOG_UNCOND ("IsExpired " <<  m_watingChannelConfEvent.IsExpired ());  
-             }
-            if ( m_watingChannelRespEvent.IsRunning ())
-             {
-               NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelRespEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelRespEvent));
-               m_watingChannelRespEvent.Cancel ();
-               NS_LOG_UNCOND ("IsExpired " <<  m_watingChannelRespEvent.IsExpired ());  
-             }
-            
-         if ( m_SendChannelResponsePacketEvent.IsRunning() )
-            {
-             m_SendChannelResponsePacketEvent.Cancel ();
-            }
-            
-         if ( m_SendChannelRequestPacketEvent.IsRunning() )
+           NS_LOG_UNCOND (GetAddress ()  <<  " set INTERNAL_SEND_CHANNEL_ACK, CHANNEL SELECTED, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );       
+           m_channelSelected (Mac48Address::ConvertFrom(GetAddress ()), Simulator::Now (), m_linkchannelRx, m_linkchannelTx);
+           m_phyTxBeginTrace (packet);
+           Cancel4Events ();
+           if (! m_channel->IsChannelUni())
            {
-             m_SendChannelRequestPacketEvent.Cancel ();
+             m_DevSameNode->TryToSetLinkChannelFromInside (m_linkchannelTx, m_linkchannelRx);
            }
-           
+           NS_LOG_UNCOND (GetAddress ()  <<  " send SendChannelACK " );  
            SendChannelACK (ppp.GetSourceAddre (), ppp.GetID ());
         }
-       //0114, ack is ignored
        else  if (ppp.GetType () == CHANNELREQ)
         {
-             SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+             SetUsedChannelOutside (ppp.GetUsedChannel0 (), ppp.GetUsedChannel1());
+             SendChannelResponse (ppp.GetSourceAddre (), ppp.GetUsedChannel0 (), ppp.GetUsedChannel1(), false);
         }
        else  if (ppp.GetType () == CHANNELACK)
         {
-           SendChannelRequest ();
+           //SendChannelRequest ();
+           NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " start channel request " );
+           SendChannelRequestPacket (0);
         }
        return;      
     }
-    
-    
+  
+    //Receive (packet);
 
-    /*
-   if (m_state == RX_Selected && ppp.GetType () == CHANNELREQ)
-    {
-        NS_LOG_UNCOND (GetAddress ()  <<   "drop CHANNELREQ since its already in  RX_TX_Selected state " );  
-        return;
-    }
-       
-    if (ppp.GetType () == CHANNELREQ)
-      {
-        //NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive CHANNELREQ at channel " << m_linkchannelRx  );
-        if (m_state == Waiting_ChannelRequest || Waiting_ChannelResp)
-          {
-            NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive CHANNELREQ at channel " << m_linkchannelRx  );
-            SetState (RX_Selected);
-            SendChannelResponse ();
-          }
-      }
-    else if  (ppp.GetType () == CHANNELCONF)
-      {
-        //NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive CHANNELCONF at channel " << m_linkchannelRx  );
-        if (m_state == RX_Selected)
-          {
-             NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive CHANNELCONF at channel " << m_linkchannelRx  );
-             SetState (RX_TX_Selected);
-             NS_LOG_UNCOND ("m_watingChannelRespEventIsRunning  " <<  m_watingChannelRespEvent.IsRunning ());  
-            if (m_watingChannelConfEvent.IsRunning ())
-             {
-               NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelConfEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelConfEvent));
-               m_watingChannelConfEvent.Cancel ();
-               NS_LOG_UNCOND ("IsExpired " <<  m_watingChannelConfEvent.IsExpired ());
-             }
-            if (m_watingChannelRespEvent.IsRunning ())
-             {
-               NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelRespEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelRespEvent));
-               m_watingChannelRespEvent.Cancel ();
-               NS_LOG_UNCOND ("IsExpired " <<  m_watingChannelRespEvent.IsExpired ());  
-             }
-             
-           if ( m_SendChannelResponsePacketEvent.IsRunning() )
-            {
-              m_SendChannelResponsePacketEvent.Cancel ();
-            }
+    return;
+}
+
+void 
+PointToPointNetDevice::Cancel4Events ()
+{
+    
+      NS_LOG_UNCOND (GetAddress () << " Cancel4Events, m_watingChannelRespTime " << m_watingChannelRespTime << ", m_watingChannelConfTime " << m_watingChannelConfTime);
+
             
-          if ( m_SendChannelRequestPacketEvent.IsRunning() )
-           {
-             m_SendChannelRequestPacketEvent.Cancel ();
-           }
-             
-            NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " SetState RX_TX_Selected ");
-          }
-      }
-    else if (ppp.GetType () == CHANNELRESP)
-      {
-       // NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive CHANNELRESP at channel " << m_linkchannelRx  );
-        if (m_state == Waiting_ChannelResp)
-         {
-            NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive CHANNELRESP at channel " << m_linkchannelRx  );
-            SetState (RX_TX_Selected);
-            NS_LOG_UNCOND ("m_watingChannelRespEventIsRunning  " <<  m_watingChannelRespEvent.IsRunning ());  
-
-            if ( m_watingChannelConfEvent.IsRunning ())
+     if ( m_watingChannelConfEvent.IsRunning ())
              {
                NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelConfEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelConfEvent));
                m_watingChannelConfEvent.Cancel ();
                NS_LOG_UNCOND ("IsExpired " <<  m_watingChannelConfEvent.IsExpired ());  
              }
-            if ( m_watingChannelRespEvent.IsRunning ())
+       NS_LOG_UNCOND ("IsExpired .." );  
+     if ( m_watingChannelRespEvent.IsRunning ())
              {
                NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " m_watingChannelRespEvent cancel, need  " << Simulator::GetDelayLeft (m_watingChannelRespEvent));
                m_watingChannelRespEvent.Cancel ();
                NS_LOG_UNCOND ("IsExpired " <<  m_watingChannelRespEvent.IsExpired ());  
              }
-            
-         if ( m_SendChannelResponsePacketEvent.IsRunning() )
-           {
+       NS_LOG_UNCOND ("IsExpired .." );  
+     if ( m_SendChannelResponsePacketEvent.IsRunning() )
+            {
              m_SendChannelResponsePacketEvent.Cancel ();
-           }
+            }
             
-        if ( m_SendChannelRequestPacketEvent.IsRunning() )
+     if ( m_SendChannelRequestPacketEvent.IsRunning() )
            {
              m_SendChannelRequestPacketEvent.Cancel ();
            }
-            
-            SendChannelConf ();
-            NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " SetState RX_TX_Selected ");
-        }
-      }
-   else
-     {
-        NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive packets with unknown type " << m_linkchannelRx  );
-        NS_LOG_UNCOND ("ReceiveChannel , type " << ppp.GetType ());  
-     }
-     */
-  
-    //Receive (packet);
-    return;
+              NS_LOG_UNCOND ("IsExpired .." );  
+
 }
+
 
 void
 PointToPointNetDevice::Receive (Ptr<Packet> packet)
@@ -962,9 +958,10 @@ PointToPointNetDevice::IsBridge (void) const
 }
 
 void 
-PointToPointNetDevice::TryToSetLinkChannelFromInside (void)
+PointToPointNetDevice::TryToSetLinkChannelFromInside (uint32_t tx, uint32_t rx)
 {
-    NS_LOG_UNCOND (GetAddress () << " receive channel command from another nodes");
+    NS_LOG_UNCOND (GetAddress () << " receive channel command from inside, it uses channel " << tx << " to send, and " << rx << " to receive.");
+    SetUsedChannelInside (tx, rx);
     TryToSetLinkChannel ();
 }
 
@@ -973,7 +970,7 @@ void
 PointToPointNetDevice::TryToSetLinkChannel (void)
 {
    NS_LOG_FUNCTION (this);
-   
+   NS_LOG_UNCOND (GetAddress () << " TryToSetLinkChannel " );
    switch (m_state)
      {
        case NO_CHANNEL_CONNECTED:
@@ -1013,39 +1010,85 @@ PointToPointNetDevice::TryToSetLinkChannel (void)
 void
 PointToPointNetDevice::SetState (LinkChannelState state)
 {
-    NS_LOG_UNCOND (GetAddress () << " SetState " << state);
+    //NS_LOG_UNCOND (GetAddress () << " SetState " << state);
     m_state = state;
 }
-
-/*
-LinkChannelState
-PointToPointNetDevice::GetState (void) const
-{
-    return m_state;
-}
-*/
 
 
 void 
 PointToPointNetDevice::ChangeTxChannel (void)
 {
-   m_linkchannelTx++;
-   m_linkchannelTx = m_linkchannelTx % 4;
+   uint16_t repetition = 0; 
+
+   while (1)
+     {
+         m_linkchannelTx++;
+         m_linkchannelTx = m_linkchannelTx % CHANNELNUMBER;
+         
+         if (repetition == CHANNELNUMBER)
+          {
+            NS_LOG_UNCOND (GetAddress ()  <<  " no available tx channel ...."); 
+          }
+   
+        uint16_t channel= m_linkchannelTx;
+        if (channel != m_channel0_usedOutside &&  channel != m_channel1_usedInside && channel != m_linkchannelRx  ) // tx (outside), rx(inside), )
+        // channel selection may not be finished due to "channel != m_linkchannelRx"
+           {
+              m_linkchannelTx = channel;
+              NS_LOG_UNCOND (GetAddress ()  <<  " ChangeTxChannel " << m_linkchannelTx); 
+              break;
+           }
+        repetition++;
+     } 
 }
 
 void 
-PointToPointNetDevice::SendChannelRequestPacket (uint8_t counter)
+PointToPointNetDevice::SetUsedChannelInside (uint32_t tx, uint32_t rx)
+{
+   if (!m_channel->IsChannelUni ())
+    {
+     m_channel0_usedInside = tx;
+     m_channel1_usedInside = rx;
+    }
+}
+
+void 
+PointToPointNetDevice::SetUsedChannelOutside (uint32_t tx, uint32_t rx)
+{
+   if (!m_channel->IsChannelUni ())
+    {
+     m_channel0_usedOutside = tx;
+     m_channel1_usedOutside = rx;
+    }
+}
+
+
+void 
+PointToPointNetDevice::SendChannelRequestPacket (uint16_t counter)
 {
    if (IsLinkUp () == false)
     {
       NS_ASSERT ("there is no channel");  
       return;
     } 
+   
+   if (m_state == EXTERNAL_REC_CHANNEL_ACK || m_state == INTERNAL_SEND_CHANNEL_ACK)
+    {
+        NS_LOG_UNCOND (GetAddress () << " restart SendChannelRequest even selected..., m_watingChannelRespTime " << m_watingChannelRespTime << ", m_watingChannelConfTime " << m_watingChannelConfTime);
+        return;
+    }
+   
+    if ( m_SendChannelRequestPacketTime +  Channel_delay_packet * 4 > Simulator::Now()  )
+      {
+          //NS_LOG_UNCOND (GetAddress ()  <<  " can not start channel req since last one did not finish"); 
+          //return;
+      }
     
    Ptr<Packet> packet = Create<Packet> ();
    m_type = CHANNELREQ;
-   
-   if (counter == 4) // && m_SendChannelRequestPacketEvent.IsRunning() )
+
+           
+   if (counter == CHANNELNUMBER) // && m_SendChannelRequestPacketEvent.IsRunning() )
      {
        NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () <<  " stop sending m_SendChannelRequestPacketEvent "); 
        if ( m_SendChannelRequestPacketEvent.IsRunning() )
@@ -1053,22 +1096,21 @@ PointToPointNetDevice::SendChannelRequestPacket (uint8_t counter)
            m_SendChannelRequestPacketEvent.Cancel ();
          }
        return;
-       //limit to 4 packets
      }
    counter++;
    
    NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " send SendChannelRequestPacket at channel " << m_linkchannelTx << " counter " << counter);
-   printf ("counter %d \n" , counter);
    Send (packet, Mac48Address ("ff:ff:ff:ff:ff:fe"), 0x800); // GetBroadcast (), 0x800 are not really used
 
    m_SendChannelRequestPacketEvent = Simulator::Schedule (Channel_delay_packet, &PointToPointNetDevice::SendChannelRequestPacket, this, counter);
+   m_SendChannelRequestPacketTime =  Simulator::Now ();
 }
 
 
 
 
 void 
-PointToPointNetDevice::SendChannelResponsePacket (uint8_t counter)
+PointToPointNetDevice::SendChannelResponsePacket (uint16_t counter)
 {
    if (IsLinkUp () == false)
     {
@@ -1076,24 +1118,15 @@ PointToPointNetDevice::SendChannelResponsePacket (uint8_t counter)
       return;
     } 
    
-   if (counter == 4) // && m_SendChannelResponsePacketEvent.IsRunning() )
+   if (counter == CHANNELNUMBER) // && m_SendChannelResponsePacketEvent.IsRunning() )
      {
        NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () <<  " stop sending m_SendChannelResponsePacket "); 
-       
-       //m_SendChannelResponsePacketEvent.Cancel ();
        if ( m_SendChannelResponsePacketEvent.IsRunning() )
          {
            m_SendChannelResponsePacketEvent.Cancel ();
          }
        return;
-       //limit to 16 packets
      }
-   
-   /*
-   if (counter % 4 == 0)
-     {
-       ChangeTxChannel ();
-     } */
    
    counter++;
    
@@ -1102,136 +1135,94 @@ PointToPointNetDevice::SendChannelResponsePacket (uint8_t counter)
    m_type = CHANNELRESP;
    
    NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " send SendChannelResponsePacket at channel " << m_linkchannelTx << " counter " << counter);
-   printf ("counter %d \n" , counter);
    Send (packet, Mac48Address ("ff:ff:ff:ff:ff:fe"), 0x800); // GetBroadcast (), 0x800 are not really used
    m_SendChannelResponsePacketEvent = Simulator::Schedule (Channel_delay_packet, &PointToPointNetDevice::SendChannelResponsePacket, this, counter);
+   m_SendChannelResponsePacketTime =  Simulator::Now ();
+
+   
 } 
 
 void 
 PointToPointNetDevice::SendChannelRequest (void)
 {
-    if (m_watingChannelRespEvent.IsRunning ())
-     {
-        m_watingChannelRespEvent.Cancel();
-     }
-    
-    if (m_watingChannelConfEvent.IsRunning ())
-     {
-        m_watingChannelConfEvent.Cancel();
-     }
-    
-    if ( m_SendChannelRequestPacketEvent.IsRunning() )
-      {
-           m_SendChannelRequestPacketEvent.Cancel ();
-      }
-    
-    if ( m_SendChannelResponsePacketEvent.IsRunning() )
-      {
-           m_SendChannelResponsePacketEvent.Cancel ();
-      }
-    
-     
-        
-    if (m_state == EXTERNAL_SEND_CHANNEL_REQ)
-      {
-            ChangeTxChannel ();
-      }
-    
     if (m_state == EXTERNAL_REC_CHANNEL_ACK || m_state == INTERNAL_SEND_CHANNEL_ACK)
-      {
-        //SendChannelRequestPacket (0);
+    {
+        NS_LOG_UNCOND (GetAddress () << " restart SendChannelRequest even selected..., m_watingChannelRespTime " << m_watingChannelRespTime << ", m_watingChannelConfTime " << m_watingChannelConfTime);
         return;
-      }
-
-    
+    }
+    if (m_state == EXTERNAL_SEND_CHANNEL_REQ)
+    {
+            ChangeTxChannel ();
+    }
+    else
+    {
+           SetState (EXTERNAL_SEND_CHANNEL_REQ);
+           WaitChannel ();
+           ChangeTxChannel ();
+    }
+    //SetState (EXTERNAL_SEND_CHANNEL_REQ);
+    //ChangeTxChannel ();
+     
+    NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " start SendChannelRequestEvent " );
     SendChannelRequestPacket (0);
-    NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " start channel request " );
     uint16_t delay = m_rng->GetInteger (1, backoffcounter);
     Time ChannelResp_delay_total = Seconds(ChannelResp_delay + delay);
-    //m_watingChannelRespEvent = Simulator::Schedule (ChannelResp_delay_total, &PointToPointNetDevice::SendChannelRequest, this);
-    if (m_state == EXTERNAL_REC_CHANNEL_ACK || m_state == INTERNAL_SEND_CHANNEL_ACK)
-      {
-        Simulator::Schedule (ChannelResp_delay_total, &PointToPointNetDevice::SendChannelRequest, this);
-      }
-    else
-     {   
-        m_watingChannelRespEvent = Simulator::Schedule (ChannelResp_delay_total, &PointToPointNetDevice::SendChannelRequest, this);       
-     }
-
+    m_watingChannelRespEvent = Simulator::Schedule (ChannelResp_delay_total, &PointToPointNetDevice::SendChannelRequest, this);   
+    m_watingChannelRespTime =  Simulator::Now ();  
 }
 
 void 
-PointToPointNetDevice::SendChannelResponse (Mac48Address dest, uint8_t channel0, uint8_t channel1)
+PointToPointNetDevice::SendChannelResponse (Mac48Address dest, uint16_t channel0, uint16_t channel1, bool timeout)
 {
-   if (m_watingChannelConfEvent.IsRunning ())
-     {
-        m_watingChannelConfEvent.Cancel();
-     }
-   
-   if (m_watingChannelRespEvent.IsRunning ())
-     {
-        m_watingChannelRespEvent.Cancel();
-     }
     
-   
-   
-   if ( m_SendChannelRequestPacketEvent.IsRunning() )
-         {
-           m_SendChannelRequestPacketEvent.Cancel ();
-         }
-   
-   if ( m_SendChannelResponsePacketEvent.IsRunning() )
-         {
-           m_SendChannelResponsePacketEvent.Cancel ();
-         }
-   
-   
-   
-   
-   
-   
-    //ChangeTxChannel ();
+   if (m_state == EXTERNAL_REC_CHANNEL_ACK || m_state == INTERNAL_SEND_CHANNEL_ACK)
+    {
+       if (timeout)
+       {
+        NS_LOG_UNCOND (GetAddress () << " restart SendChannelResponse even selected...");
+       }
+    }
+        
+   if ( m_SendChannelResponsePacketTime +  Channel_delay_packet * 4 > Simulator::Now())
+      {
+          //NS_LOG_UNCOND (GetAddress ()  <<  " can not start channel resp since last one did not finish"); 
+          //return;
+      }
+  
    m_destAddress = dest;
+   uint16_t repetition = 0;
    
-   
-   SendChannelResponsePacket (0);
-   NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " start channel resp to " << m_destAddress );
+ if ( m_linkchannelTx == CHANNELNOTDEFINED) 
+  {
+   while (1)
+     { 
+        if (repetition == CHANNELNUMBER)
+          {
+            NS_LOG_UNCOND (GetAddress ()  <<  " no available tx resp channel ...."); 
+          }
+                
+        uint32_t channel= m_rng->GetInteger (1, CHANNELNUMBER);
+        if (channel != m_channel0_usedOutside &&  channel != m_channel1_usedInside && channel != m_linkchannelRx  ) // tx (outside), rx(inside), )
+        // channel selection may not be finished due to "channel != m_linkchannelRx"
+           {
+              m_linkchannelTx = channel;
+              NS_LOG_UNCOND (GetAddress ()  <<  " choose SendChannelResponse channel " << m_linkchannelTx); 
+              break;
+           }
+        repetition++;
+     } 
+ }
+           
+    NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " start channel resp to " << m_destAddress );
+    SendChannelResponsePacket (0);
     uint16_t delay = m_rng->GetInteger (1, backoffcounter);
     Time ChannelConf_delay_total = Seconds(ChannelConf_delay + delay);
-   //m_watingChannelConfEvent = Simulator::Schedule (ChannelConf_delay_total, &PointToPointNetDevice::SendChannelRequest, this);
-   if (m_state == EXTERNAL_REC_CHANNEL_ACK || m_state == INTERNAL_SEND_CHANNEL_ACK)
+   if (timeout)
      {
-         Simulator::Schedule (ChannelConf_delay_total, &PointToPointNetDevice::SendChannelRequest, this);
-     }
-   else
-    {
-         m_watingChannelConfEvent = Simulator::Schedule (ChannelConf_delay_total, &PointToPointNetDevice::SendChannelRequest, this);
-    }
-
+          m_watingChannelConfEvent = Simulator::Schedule (ChannelConf_delay_total, &PointToPointNetDevice::SendChannelRequest, this);
+          m_watingChannelConfTime = Simulator::Now (); 
+      }
 } 
-
-
-void 
-PointToPointNetDevice::SendChannelConf ()
-{
-  if (IsLinkUp () == false)
-    {
-      NS_ASSERT ("there is no channel");  
-      return;
-    } 
-    
-   Ptr<Packet> packet = Create<Packet> ();
-
-   //PppHeader ppp;
-   //ppp.SetType (CHANNELCONF);
-   m_type = CHANNELCONF;
-   
-   //packet->AddHeader (ppp);
-   //m_linkchannelTx++;  use the  m_linkchannelTx of sending channelReq
-   NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " send SendChannelConf at channel " << m_linkchannelTx);
-   Send (packet, Mac48Address ("ff:ff:ff:ff:ff:fe"), 0x800); // GetBroadcast (), 0x800 are not really used
-
-}
 
 void
 PointToPointNetDevice::SendChannelACK (Mac48Address dest, uint32_t packetid)
@@ -1242,9 +1233,6 @@ PointToPointNetDevice::SendChannelACK (Mac48Address dest, uint32_t packetid)
       return;
     } 
     
-    
-    
-
    Ptr<Packet> packet = Create<Packet> ();
 
    m_destAddress = dest;
@@ -1257,16 +1245,36 @@ PointToPointNetDevice::SendChannelACK (Mac48Address dest, uint32_t packetid)
 
 
 void 
-PointToPointNetDevice::Forward (Ptr<Packet> packet, uint8_t counter)
+PointToPointNetDevice::Forward (Ptr<Packet> packet, uint16_t counter)
 {
    if (IsLinkUp () == false)
     {
       NS_ASSERT ("there is no channel");  
       return;
     } 
-
    
-    if (counter == 4) // && m_SendChannelResponsePacketEvent.IsRunning() )
+  if ( m_linkchannelTx == CHANNELNOTDEFINED) 
+   {
+    uint16_t repetition = 0;
+    while (1)
+     { 
+        if (repetition == CHANNELNUMBER)
+          {
+            NS_LOG_UNCOND (GetAddress ()  <<  " no available tx resp channel ...."); 
+          }
+                
+        uint32_t channel= m_rng->GetInteger (1, CHANNELNUMBER);
+        if (channel != m_channel0_usedOutside &&  channel != m_channel1_usedInside && channel != m_linkchannelRx  ) 
+           {
+              m_linkchannelTx = channel;
+              NS_LOG_UNCOND (GetAddress ()  <<  " choose SendChannelResponse channel " << m_linkchannelTx); 
+              break;
+           }
+        repetition++;
+     }  
+   }
+   
+    if (counter == CHANNELNUMBER) // && m_SendChannelResponsePacketEvent.IsRunning() )
      {
        NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () <<  " stop Forward packet "); 
        if ( m_watingChannelForwardEvent.IsRunning() )
@@ -1297,15 +1305,6 @@ PointToPointNetDevice::Send (
   NS_LOG_FUNCTION (this << packet << dest << protocolNumber);
   NS_LOG_LOGIC ("p=" << packet << ", dest=" << &dest);
   NS_LOG_LOGIC ("UID is " << packet->GetUid ());
-  
-  //NS_LOG_UNCOND (Simulator::Now() << " send packet to " << dest << "\t" << m_state);
-
-  /*
-  if (dest == GetBroadcast () && m_state != RX_TX_Selected)
-   {
-      NS_LOG_UNCOND (Simulator::Now() <<" channel is not selected, " << GetAddress () << ", size " << packet->GetSize ());
-      return false; // temperorily, broadcast is only used for channel selection 
-   }*/
   
   NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send to " << dest);
 
