@@ -283,7 +283,7 @@ PointToPointHelper::Install (Ptr<Node> a, Ptr<Node> b)
 NetDeviceContainer 
 PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
 {
-  NetDeviceContainer container;
+  //NetDeviceContainer container;
   std::cout << ".................InstallBi : a  " << a->GetId () << ", b " <<  b->GetId () << '\n';
 
     

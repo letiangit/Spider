@@ -82,6 +82,8 @@ public:
     #define CHANNELRESP 18
     #define CHANNELCONF 19
     #define CHANNELACK 33
+    #define DATATYPE 49
+
 
     #define CHANNELNOTDEFINED 255
 
@@ -218,6 +220,7 @@ public:
   virtual bool IsBridge (void) const;
 
   virtual bool Send (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber);
+  virtual bool SendChannelSelection (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber);
   virtual bool SendFrom (Ptr<Packet> packet, const Address& source, const Address& dest, uint16_t protocolNumber);
   virtual void SendChannelRequest (void);
   //virtual void SendChannelResponse ();
@@ -580,8 +583,8 @@ private:
    uint32_t m_packetId;
    uint32_t m_ackid;
    
-   uint32_t ChannelResp_delay; 
-   uint32_t ChannelConf_delay; 
+   Time ChannelResp_delay; 
+   Time ChannelConf_delay; 
    Time Channel_delay_packet; 
    Time ChannelWaiting_Interval; 
    uint32_t CCmax;

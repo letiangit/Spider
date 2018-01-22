@@ -38,6 +38,7 @@ PppHeader::PppHeader ()
     m_Qos = 0;
     m_channel0 = CHANNELNOTDEFINED;
     m_channel1 = CHANNELNOTDEFINED;
+    m_type = DATATYPE;
 }
 
 PppHeader::~PppHeader ()

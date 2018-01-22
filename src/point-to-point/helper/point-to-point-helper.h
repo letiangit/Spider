@@ -212,6 +212,8 @@ private:
   
   Ptr<PointToPointNetDevice> devBFirst;
   Ptr<PointToPointNetDevice> devBSecond;
+  
+  NetDeviceContainer container;
 };
 
 } // namespace ns3

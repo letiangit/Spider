@@ -56,6 +56,8 @@ public:
     #define CHANNELRESP 18
     #define CHANNELCONF 19
     #define CHANNELNOTDEFINED 255
+    #define DATATYPE 49
+
 
   /**
    * \brief Construct a PPP header.
