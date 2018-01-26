@@ -32,13 +32,14 @@ using namespace std;
 using namespace ns3;
 
 uint32_t ChannelNum = 0;
+string m_Outputpath;
 
 void
 ChannelSelection  (std::string contex, Mac48Address addr, Time ts, uint32_t rx, uint32_t tx)
 {
     ChannelNum++;
     std::ofstream myfile;
-    std::string dropfile="./OptimalRawGroup/channelSelected.txt";
+    std::string dropfile=m_Outputpath;
     myfile.open (dropfile, ios::out | ios::app);
     myfile << ChannelNum << ", device " << addr << " at time " << ts  << " select chanel rx " <<  rx << ", tx " << tx << "\n";
     myfile.close();
@@ -51,11 +52,19 @@ main (int argc, char *argv[])
 {
   uint32_t seed = 1;
   uint32_t Nnodes = 11;
+  uint32_t RestartTimeout = 2000;
+  uint32_t PacketIntervalCh = 10;
+  uint32_t CycelIntervalCh = 20;
+  uint32_t backoffcounter = 1000;
+  uint32_t NexternalSel = 1;
   bool UniChannel = false;
   bool NominalMode = true;
+  string Outputpath;
     
   string DataRate; // nominal mode, 1.1 Mbps (failure mode)
   string Delay;
+  uint32_t PACKETREPEATNUMBER;
+  uint32_t Nchannel = 4;
 
   
   CommandLine cmd;
@@ -63,16 +72,12 @@ main (int argc, char *argv[])
   cmd.AddValue ("Nnodes", "nubmer of staellite", Nnodes);
   cmd.AddValue ("UniChannel", "chanel type, uni- or bi- directional", UniChannel);
   cmd.AddValue ("NominalMode", "Nominal or failure mode", NominalMode);
-  if (NominalMode)
-    {
-       DataRate = "1.3Mbps"; // nominal mode, 1.1 Mbps (failure mode)
-       Delay = "14.4ms";
-    }
-  else
-    {
-       DataRate = "1.1Mbps"; // nominal mode, 1.1 Mbps (failure mode)
-       Delay = "17.2ms";
-    }
+  cmd.AddValue ("RestartTimeout", "ms", RestartTimeout);
+  cmd.AddValue ("PacketIntervalCh", "ms", PacketIntervalCh);
+  cmd.AddValue ("CycelIntervalCh", "ms", CycelIntervalCh);
+  cmd.AddValue ("backoffcounter", "backoff after timeout, ms", backoffcounter);
+  cmd.AddValue ("NexternalSel", "nubmer of satellite can receive external channel selection command, ms", NexternalSel);
+  cmd.AddValue ("Outputpath", "path of channel selextion result", Outputpath);
 
 
   cmd.Parse (argc, argv);
@@ -81,6 +86,19 @@ main (int argc, char *argv[])
   Time::SetResolution (Time::NS);
   LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
   LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
+    
+  PACKETREPEATNUMBER = Nchannel * CycelIntervalCh/PacketIntervalCh;
+  if (NominalMode)
+    {
+        DataRate = "1.3Mbps"; // nominal mode, 1.1 Mbps (failure mode)
+        Delay = "14.4ms";
+    }
+    else
+    {
+        DataRate = "1.1Mbps"; // nominal mode, 1.1 Mbps (failure mode)
+        Delay = "17.2ms";
+    }
+  m_Outputpath = Outputpath;
 
   NodeContainer nodes;
   nodes.Create (Nnodes);
@@ -90,12 +108,15 @@ main (int argc, char *argv[])
   pointToPoint.SetChannelAttribute ("Delay", StringValue (Delay));
   pointToPoint.SetChannelAttribute ("UniChannel", BooleanValue (UniChannel));
   
-  pointToPoint.SetDeviceAttribute ("ChannelResp_delay", TimeValue (MilliSeconds (2000.0)));
-  pointToPoint.SetDeviceAttribute ("ChannelConf_delay", TimeValue (MilliSeconds (2000.0)));
-  pointToPoint.SetDeviceAttribute ("Channel_delay_packet", TimeValue (MilliSeconds (10.0)));
-  pointToPoint.SetDeviceAttribute ("ChannelWaiting_Interval", TimeValue (MilliSeconds (10.0)));
+  pointToPoint.SetDeviceAttribute ("ChannelResp_delay", TimeValue (MilliSeconds (RestartTimeout)));
+  pointToPoint.SetDeviceAttribute ("ChannelConf_delay", TimeValue (MilliSeconds (RestartTimeout)));
+    
+  pointToPoint.SetDeviceAttribute ("Channel_delay_packet", TimeValue (MilliSeconds (PacketIntervalCh)));
+  pointToPoint.SetDeviceAttribute ("ChannelWaiting_Interval", TimeValue (MilliSeconds (CycelIntervalCh)));
+  pointToPoint.SetDeviceAttribute ("PACKETREPEATNUMBER", UintegerValue (PACKETREPEATNUMBER));
   // channel request packet transmission time, 21 bytes/DataRate ~= 0.13 ms
-  pointToPoint.SetDeviceAttribute ("backoffcounter", UintegerValue (1000)); //in the unit of ms
+  pointToPoint.SetDeviceAttribute ("backoffcounter", UintegerValue (backoffcounter)); //in the unit of ms
+  pointToPoint.SetDeviceAttribute ("Outputpath", StringValue (Outputpath));
     
  uint32_t nodei, nodej;
  NetDeviceContainer devicesSet;
@@ -116,7 +137,14 @@ main (int argc, char *argv[])
     
   NS_LOG_UNCOND ("install devicesSet finish " << nodes.Get(Nnodes-1)->GetId () << "\t" << nodes.Get(0)->GetId ()  << ", size " << devicesSet.GetN () );
 
-  Config::Set ("/NodeList/0/DeviceList/0/$ns3::PointToPointNetDevice/StartChannelSelection", BooleanValue(true)); //node  receive external command for channel selection
+  for (uint32_t kk = 0; kk < NexternalSel; kk++)
+    {
+      std::ostringstream STA;
+      STA << kk;
+      std::string strSTA = STA.str();
+        
+      Config::Set ("/NodeList/"+strSTA+"/DeviceList/0/$ns3::PointToPointNetDevice/StartChannelSelection", BooleanValue(true)); //node  receive external command for channel selection
+    }
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDevice/ChannelSelected", MakeCallback (&ChannelSelection));
 
 
@@ -128,12 +156,13 @@ main (int argc, char *argv[])
   Ipv4InterfaceContainer interfaces = address.Assign (devicesSet);
   
   std::ofstream myfile;
-  std::string dropfile="./OptimalRawGroup/channelSelected.txt";
+  std::string dropfile=m_Outputpath;
   myfile.open (dropfile, ios::out | ios::app);
   myfile << "Start channel selection ----------- Nnodes " << Nnodes << ", Ndevice " << devicesSet.GetN () << ", UniChannel " << UniChannel << "\n";
   //myfile << "nodes ----------- Nnodes " << nodes.Get(0)->GetId () << ", device " << nodes.Get(0)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(0)->GetDevice(1)->GetAddress() << "\n";
   myfile.close();
 
+  /*
   UdpEchoServerHelper echoServer (9);
 
   ApplicationContainer serverApps = echoServer.Install (nodes.Get (0));
@@ -150,9 +179,9 @@ main (int argc, char *argv[])
 
   ApplicationContainer clientApps = echoClient.Install (nodes.Get (Nnodes-1));
   clientApps.Start (Seconds (2.0));
-  clientApps.Stop (Seconds (1000.0));
+  clientApps.Stop (Seconds (1000.0)); */
     
-  pointToPoint.EnablePcapAll ("secondLe", true);
+  //pointToPoint.EnablePcapAll ("secondLe", true);
   Simulator::Stop (Seconds (1000.0));
     
     NS_LOG_UNCOND ("install devicesSet finish ....."  );

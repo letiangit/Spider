@@ -31,6 +31,7 @@
 #include "ns3/ptr.h"
 #include "ns3/mac48-address.h"
 #include "ns3/event-id.h"
+#include "ns3/string.h"
 
 
 namespace ns3 {
@@ -88,6 +89,7 @@ public:
     #define CHANNELNOTDEFINED 255
 
     #define CHANNELNUMBER 4
+    //#define PACKETREPEATNUMBER 4
 
   /**
    * \brief Get the TypeId
@@ -229,6 +231,7 @@ public:
   virtual void Forward (Ptr<Packet> packet, uint16_t count);
   virtual void SetUsedChannelInside (uint32_t tx, uint32_t rx);
   virtual void SetUsedChannelOutside (uint32_t tx, uint32_t rx);
+  virtual bool Constrainthold (void);
 
 
 
@@ -269,14 +272,14 @@ private:
        EXTERNAL_CHANNEL_COMMAND,
        EXTERNAL_SEND_CHANNEL_REQ,
        EXTERNAL_REC_CHANNEL_RESP,
-       EXTERNAL_SEND_CHANNEL_ACK,
+       EXTERNAL_SEND_CHANNEL_ACK, // nearly
        EXTERNAL_REC_CHANNEL_REQ,
        EXTERNAL_SEND_CHANNEL_RESP,
        EXTERNAL_REC_CHANNEL_ACK,
        INTERNAL_REC_CHANNEL_REQ,
        INTERNAL_SEND_CHANNEL_RESP,
        INTERNAL_REC_CHANNEL_ACK,
-       INTERNAL_SEND_CHANNEL_REQ,
+       INTERNAL_SEND_CHANNEL_REQ,   // nearly
        INTERNAL_REC_CHANNEL_RESP,
        INTERNAL_SEND_CHANNEL_ACK
     };
@@ -596,6 +599,9 @@ private:
    Time  m_watingChannelRespTime;  
    Time  m_watingChannelConfTime; 
    bool m_externalChSel;
+   bool selectedTraced;
+   uint16_t PACKETREPEATNUMBER;
+   std::string  m_outputpath;
 
    
    
