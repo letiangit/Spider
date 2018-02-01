@@ -125,9 +125,9 @@ PointToPointChannel::TransmitStart (
   if (IsChannelUni () )
     {
         NS_ASSERT (m_link[0].m_state != INITIALIZING);
-        NS_LOG_UNCOND ("src " << src->GetAddress () );
-        NS_LOG_UNCOND ("src " << m_link[0].m_src->GetAddress () );
-        NS_LOG_UNCOND ("dst " << m_link[0].m_dst->GetAddress () );
+        NS_LOG_DEBUG ("src " << src->GetAddress () );
+        NS_LOG_DEBUG ("src " << m_link[0].m_src->GetAddress () );
+        NS_LOG_DEBUG ("dst " << m_link[0].m_dst->GetAddress () );
 
         NS_ASSERT_MSG (src == m_link[0].m_src, "incorrect sender");
 

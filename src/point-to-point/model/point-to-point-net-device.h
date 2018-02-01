@@ -32,6 +32,7 @@
 #include "ns3/mac48-address.h"
 #include "ns3/event-id.h"
 #include "ns3/string.h"
+#include "ns3/spf.h"
 
 
 namespace ns3 {
@@ -90,6 +91,8 @@ public:
 
     #define CHANNELNUMBER 4
     //#define PACKETREPEATNUMBER 4
+    
+    #define V 22
 
   /**
    * \brief Get the TypeId
@@ -222,6 +225,7 @@ public:
   virtual bool IsBridge (void) const;
 
   virtual bool Send (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber);
+  virtual bool SendFromInside (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber, bool fromUppper);
   virtual bool SendChannelSelection (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber);
   virtual bool SendFrom (Ptr<Packet> packet, const Address& source, const Address& dest, uint16_t protocolNumber);
   virtual void SendChannelRequest (void);
@@ -232,7 +236,9 @@ public:
   virtual void SetUsedChannelInside (uint32_t tx, uint32_t rx);
   virtual void SetUsedChannelOutside (uint32_t tx, uint32_t rx);
   virtual bool Constrainthold (void);
-
+  virtual uint16_t LookupRoutingTable (Mac48Address addr);
+  virtual void CreateRoutingTable (void);
+  virtual void InitializeTopology (void);
 
 
 
@@ -610,6 +616,10 @@ private:
      const uint32_t tx);
      
     TracedCallback<Mac48Address, Time, uint32_t, uint32_t > m_channelSelected;
+    
+    uint32_t Topology[V][V];
+    ShortPath  CalPath;
+    uint32_t * tablePoint;
 
 };
 

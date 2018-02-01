@@ -45,11 +45,62 @@ ChannelSelection  (std::string contex, Mac48Address addr, Time ts, uint32_t rx, 
     myfile.close();
 }
 
+void
+PopulateArpCache ()
+{
+    Ptr<ArpCache> arp = CreateObject<ArpCache> ();
+    arp->SetAliveTimeout (Seconds(3600 * 24 * 365));
+    for (NodeList::Iterator i = NodeList::Begin(); i != NodeList::End(); ++i)
+    {
+        Ptr<Ipv4L3Protocol> ip = (*i)->GetObject<Ipv4L3Protocol> ();
+        NS_ASSERT(ip !=0);
+        ObjectVectorValue interfaces;
+        ip->GetAttribute("InterfaceList", interfaces);
+        for(ObjectVectorValue::Iterator j = interfaces.Begin(); j !=
+            interfaces.End (); j ++)
+        {
+            Ptr<Ipv4Interface> ipIface = (j->second)->GetObject<Ipv4Interface> ();
+            NS_ASSERT(ipIface != 0);
+            Ptr<NetDevice> device = ipIface->GetDevice();
+            NS_ASSERT(device != 0);
+            Mac48Address addr = Mac48Address::ConvertFrom(device->GetAddress ());
+            for(uint32_t k = 0; k < ipIface->GetNAddresses (); k ++)
+            {
+                Ipv4Address ipAddr = ipIface->GetAddress (k).GetLocal();
+                if(ipAddr == Ipv4Address::GetLoopback())
+                continue;
+                ArpCache::Entry * entry = arp->Add(ipAddr);
+                entry->MarkWaitReply(0);
+                entry->MarkAlive(addr);
+                std::cout << "Arp Cache: Adding the pair (" << addr << "," << ipAddr << ")" << std::endl;
+            }
+        }
+    }
+    for (NodeList::Iterator i = NodeList::Begin(); i != NodeList::End(); ++i)
+    {
+        Ptr<Ipv4L3Protocol> ip = (*i)->GetObject<Ipv4L3Protocol> ();
+        NS_ASSERT(ip !=0);
+        ObjectVectorValue interfaces;
+        ip->GetAttribute("InterfaceList", interfaces);
+        for(ObjectVectorValue::Iterator j = interfaces.Begin(); j !=interfaces.End (); j ++)
+        {
+            Ptr<Ipv4Interface> ipIface = (j->second)->GetObject<Ipv4Interface> ();
+            ipIface->SetAttribute("ArpCache", PointerValue(arp));
+        }
+    }
+}
 
 
 int
 main (int argc, char *argv[])
 {
+    //LogComponentEnable ("Ipv4Interface", LOG_LOGIC);
+    //LogComponentEnable ("ArpL3Protocol", LOG_LOGIC);
+    //LogComponentEnable ("Ipv4L3Protocol", LOG_LOGIC);
+    
+
+    
+
   uint32_t seed = 1;
   uint32_t Nnodes = 11;
   uint32_t RestartTimeout = 2000;
@@ -86,6 +137,8 @@ main (int argc, char *argv[])
   Time::SetResolution (Time::NS);
   LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
   LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
+    
+  Outputpath = "./OptimalRawGroup/result.txt";
     
   PACKETREPEATNUMBER = Nchannel * CycelIntervalCh/PacketIntervalCh;
   if (NominalMode)
@@ -157,12 +210,12 @@ main (int argc, char *argv[])
   
   std::ofstream myfile;
   std::string dropfile=m_Outputpath;
-  myfile.open (dropfile, ios::out | ios::app);
+  myfile.open (dropfile, ios::out | ios::trunc);
   myfile << "Start channel selection ----------- Nnodes " << Nnodes << ", Ndevice " << devicesSet.GetN () << ", UniChannel " << UniChannel << "\n";
   //myfile << "nodes ----------- Nnodes " << nodes.Get(0)->GetId () << ", device " << nodes.Get(0)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(0)->GetDevice(1)->GetAddress() << "\n";
   myfile.close();
 
-  /*
+  
   UdpEchoServerHelper echoServer (9);
 
   ApplicationContainer serverApps = echoServer.Install (nodes.Get (0));
@@ -173,22 +226,24 @@ main (int argc, char *argv[])
 
   echoClient.SetAttribute ("MaxPackets", UintegerValue (1000));
   echoClient.SetAttribute ("Interval", TimeValue (Seconds (100.0)));
-  echoClient.SetAttribute ("PacketSize", UintegerValue (1024));
-    NS_LOG_UNCOND ("install devicesSet finish ....."  );
+  echoClient.SetAttribute ("PacketSize", UintegerValue (500));
+  NS_LOG_UNCOND ("install devicesSet finish ....."  );
 
 
-  ApplicationContainer clientApps = echoClient.Install (nodes.Get (Nnodes-1));
+  ApplicationContainer clientApps = echoClient.Install (nodes.Get (Nnodes-4));
   clientApps.Start (Seconds (2.0));
-  clientApps.Stop (Seconds (1000.0)); */
+  clientApps.Stop (Seconds (1000.0));
     
   //pointToPoint.EnablePcapAll ("secondLe", true);
   Simulator::Stop (Seconds (1000.0));
     
-    NS_LOG_UNCOND ("install devicesSet finish ....."  );
+  NS_LOG_UNCOND ("install devicesSet finish ....."  );
 
-
+  //PopulateArpCache ();
 
   //Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+    
+
 
   Simulator::Run ();
   Simulator::Destroy ();

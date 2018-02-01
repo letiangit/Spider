@@ -253,7 +253,8 @@ PolarSatPosition::GetCoord ()
         //std::cout << "partial " << partial << "\t" << Simulator::Now().GetSeconds () << "\t " << current.r << "\t" << RAD_TO_DEG(theta_cur) << "\t"  << RAD_TO_DEG(phi_cur)   << std::endl;
 
 
-	assert (inclination_ < PI);
+	//assert (inclination_ < PI);
+        NS_ASSERT (inclination_ < PI);
 
 	// asin returns value between -PI/2 and PI/2, so 
 	// theta_new guaranteed to be between 0 and PI
@@ -367,7 +368,8 @@ SunSynStaPosition::GetCoord ()
         //std::cout << "partial " << partial << "\t" << Simulator::Now().GetSeconds () << "\t " << current.r << "\t" << RAD_TO_DEG(theta_cur) << "\t"  << RAD_TO_DEG(phi_cur)   << std::endl;
 
 
-	assert (inclination_ < PI);
+	//assert (inclination_ < PI);
+        NS_ASSERT (inclination_ < PI);
 
 	// asin returns value between -PI/2 and PI/2, so 
 	// theta_new guaranteed to be between 0 and PI
