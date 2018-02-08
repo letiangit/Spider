@@ -106,9 +106,9 @@ PppHeader::Serialize (Buffer::Iterator start) const
    
    temp = ((m_type & 0x3f) << 2 ) |  (m_Qos & 0x03);
    uint32_t temp_id;
-   temp_id = (m_ttl << 24 ) ||  m_id; 
+   temp_id = (m_ttl << 24 ) |  m_id; 
    
-  //printf ("Serialize %d,  m_type %d \n", temp, m_type);
+  NS_LOG_UNCOND ("Serialize temp_id  " << temp_id << ", id " << m_id);
   start.WriteHtolsbU16 (m_protocol);
   start.WriteU8 (temp);
   start.WriteHtolsbU32 (temp_id);
@@ -140,6 +140,8 @@ PppHeader::Deserialize (Buffer::Iterator start)
   //printf ("m_type %d \n", m_type);
   NS_ASSERT (m_type < 64);
   temp_id = i.ReadLsbtohU32 ();
+
+  m_id = temp_id & 0xffffff;
   ReadFrom (i, m_addressSrc);
   ReadFrom (i, m_addressDest);
   if (m_type == CHANNELREQ)

@@ -186,7 +186,7 @@ public:
   void ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel);
   void WaitChannel ();
   void ChangeTxChannel ();
-
+  void Reset ();
 
 
   // The remaining methods are documented in ns3::NetDevice*
@@ -230,7 +230,7 @@ public:
   virtual bool SendFrom (Ptr<Packet> packet, const Address& source, const Address& dest, uint16_t protocolNumber);
   virtual void SendChannelRequest (void);
   //virtual void SendChannelResponse ();
-  virtual void SendChannelResponse (Mac48Address dest, uint16_t channel0, uint16_t channel1, bool timeout);
+  virtual void SendChannelResponse (Mac48Address dest, uint16_t channel0, uint16_t channel1, bool timeout, uint32_t id);
   virtual void SendChannelACK (Mac48Address dest, uint32_t packetid);
   virtual void Forward (Ptr<Packet> packet, uint16_t count);
   virtual void SetUsedChannelInside (uint32_t tx, uint32_t rx);
@@ -336,6 +336,7 @@ private:
    * \param protocolNumber protocol number
    */
   void AddHeader (Ptr<Packet> p, uint16_t protocolNumber);
+  void AddHeaderChannel (Ptr<Packet> p, uint16_t protocolNumber);
 
   /**
    * Removes, from a packet of data, all headers and trailers that
@@ -580,6 +581,7 @@ private:
    EventId m_SendChannelRequestPacketEvent;
    EventId m_SendChannelResponsePacketEvent;
    EventId m_watingChannelForwardEvent;
+   EventId m_ResetTimeOutEvent;
    Ptr< UniformRandomVariable > m_rng;
    uint16_t m_type;
    //uint16_t m_channel0_used;
@@ -591,6 +593,8 @@ private:
    Mac48Address m_destAddress;
    uint32_t m_packetId;
    uint32_t m_ackid;
+   uint32_t m_respid;
+   uint32_t m_reqid;
    
    Time ChannelResp_delay; 
    Time ChannelConf_delay; 
