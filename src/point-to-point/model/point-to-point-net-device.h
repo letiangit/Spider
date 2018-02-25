@@ -33,6 +33,7 @@
 #include "ns3/event-id.h"
 #include "ns3/string.h"
 #include "ns3/spf.h"
+#include <map>
 
 
 namespace ns3 {
@@ -153,7 +154,8 @@ public:
    *
    * \param queue Ptr to the new queue.
    */
-  void SetQueue (Ptr<Queue> queue);
+  void SetQueue (Ptr<Queue> queue, Ptr<Queue> queueCritical, Ptr<Queue> queuehighPri, Ptr<Queue> queueBestEff, Ptr<Queue> queueBackGround); 
+  void SetQueue (Ptr<Queue> queue); 
 
   /**
    * Get a copy of the attached Queue.
@@ -239,6 +241,10 @@ public:
   virtual uint16_t LookupRoutingTable (Mac48Address addr);
   virtual void CreateRoutingTable (void);
   virtual void InitializeTopology (void);
+  //virtual void SendDataPacket (void);
+  virtual Ptr<Packet> PreparePacketToSend (void);
+
+
 
 
 
@@ -574,6 +580,12 @@ private:
    * \return The corresponding PPP protocol number
    */
   static uint16_t EtherToPpp (uint16_t protocol);
+  typedef std::map<uint8_t, Ptr<Queue> > Queues;
+  Queues m_queueMap;
+  
+  ObjectFactory m_queueFactory;         //!< Queue Factory
+
+
   
    EventId m_watingChannelRespEvent;
    EventId m_watingChannelConfEvent;
@@ -624,6 +636,7 @@ private:
     uint32_t Topology[V][V];
     ShortPath  CalPath;
     uint32_t * tablePoint;
+    uint8_t m_Qos;
 
 };
 

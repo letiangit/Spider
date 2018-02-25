@@ -36,6 +36,7 @@ NS_OBJECT_ENSURE_REGISTERED (PppHeader);
 PppHeader::PppHeader ()
 {
     m_Qos = 0;
+    m_ttl = 0;
     m_channel0 = CHANNELNOTDEFINED;
     m_channel1 = CHANNELNOTDEFINED;
     m_type = DATATYPE;
@@ -108,6 +109,8 @@ PppHeader::Serialize (Buffer::Iterator start) const
    uint32_t temp_id;
    temp_id = (m_ttl << 24 ) |  m_id; 
    
+  NS_LOG_UNCOND ("m_type  " << m_type << ", m_Qos " << m_Qos << ", m_ttl " << uint16_t(m_ttl));
+
   NS_LOG_UNCOND ("Serialize temp_id  " << temp_id << ", id " << m_id);
   start.WriteHtolsbU16 (m_protocol);
   start.WriteU8 (temp);
@@ -137,6 +140,7 @@ PppHeader::Deserialize (Buffer::Iterator start)
   temp = i.ReadU8 ();
   //printf ("Deserialize %d \n", temp);
   m_type = (temp >> 2) & 0x3f;
+  m_Qos = temp & 0x03;
   //printf ("m_type %d \n", m_type);
   NS_ASSERT (m_type < 64);
   temp_id = i.ReadLsbtohU32 ();

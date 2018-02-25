@@ -253,8 +253,21 @@ PointToPointNetDevice::PointToPointNetDevice ()
   uint64_t delay = m_rng->GetInteger (1, CCmax);
   Simulator::Schedule (MilliSeconds (delay), &PointToPointNetDevice::TryToSetLinkChannelExternal, this);
   
- 
+  /*
+  Ptr<Queue> queueCritical;
+  Ptr<Queue> queuehighPri;
+  Ptr<Queue> queueBestEff;
+  Ptr<Queue> queueBackGround; */
+   
   
+  
+
+  /*
+  m_queueMap.insert (std::make_pair (3, queueCritical));
+  m_queueMap.insert (std::make_pair (2, queuehighPri));
+  m_queueMap.insert (std::make_pair (1, queueBestEff));
+  m_queueMap.insert (std::make_pair (0, queueBackGround));  
+   * */
 }
 
 PointToPointNetDevice::~PointToPointNetDevice ()
@@ -311,6 +324,7 @@ PointToPointNetDevice::AddHeader (Ptr<Packet> p, uint16_t protocolNumber)
   ppp.SetType (m_type);
   ppp.SetSourceAddre (Mac48Address::ConvertFrom (GetAddress ()));
   ppp.SetDestAddre (m_destAddress);
+  ppp.SetQos (m_Qos);
   NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress () << " add header to " << m_destAddress);
 
   
@@ -458,7 +472,7 @@ PointToPointNetDevice::TransmitStart (Ptr<Packet> p)
   m_phyTxBeginTrace (m_currentPkt);
 
   Time txTime = m_bps.CalculateBytesTxTime (p->GetSize ());
-  NS_LOG_DEBUG ("SIZE " << p->GetSize () << ", txTime " << txTime);
+  NS_LOG_UNCOND ("SIZE " << p->GetSize () << ", txTime " << txTime);
   Time txCompleteTime = txTime + m_tInterframeGap;
 
   NS_LOG_LOGIC ("Schedule TransmitCompleteEvent in " << txCompleteTime.GetSeconds () << "sec");
@@ -494,6 +508,7 @@ PointToPointNetDevice::TransmitComplete (void)
   m_currentPkt = 0;
 
   Ptr<Packet> p = m_queue->Dequeue ();
+  //Ptr<Packet> p = PreparePacketToSend ();
   if (p == 0)
     {
       //
@@ -508,6 +523,7 @@ PointToPointNetDevice::TransmitComplete (void)
   m_snifferTrace (p);
   m_promiscSnifferTrace (p);
   NS_LOG_DEBUG ("TransmitComplete");
+  NS_LOG_UNCOND ("TransmitComplete");
   TransmitStart (p);
 }
 /*
@@ -582,6 +598,28 @@ PointToPointNetDevice::Attach (Ptr<PointToPointChannel> ch, uint16_t rx)
         //   std::cout << "Attach....... : \n";
 
   return true;
+}
+
+void
+PointToPointNetDevice::SetQueue (Ptr<Queue> q, Ptr<Queue> queueCritical, Ptr<Queue> queuehighPri, Ptr<Queue> queueBestEff, Ptr<Queue> queueBackGround)
+{
+  NS_LOG_FUNCTION (this << q);
+  m_queue = q;
+  
+  //Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+  //Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+  //Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+  //Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();  
+  /*
+  Ptr<Queue> queueCritical;
+  Ptr<Queue> queuehighPri;
+  Ptr<Queue> queueBestEff;
+  Ptr<Queue> queueBackGround; */
+          
+  m_queueMap[3] = queueCritical;
+  m_queueMap[2] = queuehighPri;
+  m_queueMap[1] = queueBestEff;
+  m_queueMap[0] = queueBackGround; 
 }
 
 void
@@ -988,6 +1026,9 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       //
       PppHeader ppp;
          packet->PeekHeader (ppp);
+             
+       
+  
       ProcessHeader (packet, protocol);
       
       NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
@@ -1011,6 +1052,12 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ) || ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
       {
       m_rxCallback (this, packet, protocol, GetRemote ());
+      }
+      
+      if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ))
+      {
+      m_Qos = ppp.GetQos ();
+      NS_LOG_UNCOND ("receive data m_Qos " << uint16_t (m_Qos));
       }
       //NS_LOG_DEBUG ( GetAddress () << "\t" << m_address );
 
@@ -1671,6 +1718,7 @@ PointToPointNetDevice::SendChannelRequestPacket (uint16_t counter)
            << ", id " << m_reqid << ", PACKETREPEATNUMBER " << PACKETREPEATNUMBER);
       
    AddHeaderChannel (packet, 0x800);
+   NS_LOG_UNCOND ( " here " );
    SendChannelSelection (packet, Mac48Address ("ff:ff:ff:ff:ff:fe"), 0x800); // GetBroadcast (), 0x800 are not really used
 
    m_SendChannelRequestPacketEvent = Simulator::Schedule (Channel_delay_packet, &PointToPointNetDevice::SendChannelRequestPacket, this, counter);
@@ -1933,7 +1981,7 @@ PointToPointNetDevice::SendChannelSelection (
   NS_LOG_LOGIC ("p=" << packet << ", dest=" << &dest);
   NS_LOG_LOGIC ("UID is " << packet->GetUid ());
   
-  NS_LOG_DEBUG (Simulator::Now() <<" \t " << GetAddress () << ", send to " << dest);
+  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send to " << dest);
   
   if (m_type ==  DATATYPE )
   {
@@ -2075,32 +2123,76 @@ PointToPointNetDevice::Send (
   // Stick a point to point protocol header on the packet in preparation for
   // shoving it out the door.
   //
+  m_Qos = m_rng->GetInteger (0, 3);
+  NS_LOG_UNCOND ("set data m_Qos " << uint16_t(m_Qos));
   AddHeader (packet, protocolNumber);
 
   m_macTxTrace (packet);
+  
+   PppHeader ppp;
+   packet->PeekHeader (ppp);
+    
+  m_Qos = ppp.GetQos ();
+  NS_LOG_UNCOND ("send data m_Qos " << uint16_t(m_Qos));
+  m_queueMap.find (m_Qos)->second->Enqueue (packet);
+  
+  
+  
+
+
+  
 
   //
   // We should enqueue and dequeue the packet to hit the tracing hooks.
   //
-  if (m_queue->Enqueue (packet))
-    {
+  //if (m_queueMap.find (m_Qos)->Enqueue (packet)) // ?? what does this mean? todo
+  //  {
       //
       // If the channel is ready for transition we send the packet right now
       // 
       if (m_txMachineState == READY)
         {
-          packet = m_queue->Dequeue ();
+          packet = PreparePacketToSend ();
           m_snifferTrace (packet);
           m_promiscSnifferTrace (packet);
           return TransmitStart (packet);
         }
-      return true;
-    }
+     /* else if (m_txMachineState == BUSY)
+        {
+          // wait until READY
+          //then send
+          
+        }
+      return true; */
+    // }
 
   // Enqueue may fail (overflow)
   m_macTxDropTrace (packet);
   return false;
 }
+
+Ptr<Packet>
+PointToPointNetDevice::PreparePacketToSend ()
+{
+  Ptr<Packet> packet;  
+  
+  packet = m_queue->Dequeue ();
+  if (packet != 0)
+  {
+      return packet;
+  }
+
+    
+  for (uint8_t qos = 4; qos > 0; qos--)
+   {
+       NS_LOG_UNCOND ("PointToPointNetDevice m_Qos " << uint16_t (qos-1) << ", size " << m_queueMap.find (qos-1)->second->GetNPackets ()); 
+       packet =  m_queueMap.find (qos-1)->second->Dequeue ();
+       if (packet != 0)
+            break;
+   }
+  return packet;
+}
+
 
 bool
 PointToPointNetDevice::SendFrom (Ptr<Packet> packet, 

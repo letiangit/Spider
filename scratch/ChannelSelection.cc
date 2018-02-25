@@ -215,7 +215,7 @@ main (int argc, char *argv[])
   //myfile << "nodes ----------- Nnodes " << nodes.Get(0)->GetId () << ", device " << nodes.Get(0)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(0)->GetDevice(1)->GetAddress() << "\n";
   myfile.close();
 
-  /*
+  
   UdpEchoServerHelper echoServer (9);
  
   ApplicationContainer serverApps = echoServer.Install (nodes.Get (0));
@@ -232,7 +232,7 @@ main (int argc, char *argv[])
 
   ApplicationContainer clientApps = echoClient.Install (nodes.Get (Nnodes-4));
   clientApps.Start (Seconds (2.0));
-  clientApps.Stop (Seconds (1000.0)); */
+  clientApps.Stop (Seconds (1000.0));
     
   //pointToPoint.EnablePcapAll ("secondLe", true);
   Simulator::Stop (Seconds (1000.0));

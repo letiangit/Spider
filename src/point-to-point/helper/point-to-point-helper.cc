@@ -298,7 +298,11 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      m_nodeDeviceMap[a->GetId ()] = devASecond;
      std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
-     devASecond->SetQueue (queueA);
+     Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> (); 
+     devASecond->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
 
      //build connection between two device
      devAFirst->AddDevice (devASecond);
@@ -314,7 +318,11 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      m_nodeDeviceMap[a->GetId ()] = devAFirst;
      std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
-     devAFirst->SetQueue (queueA);
+     Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
+     devAFirst->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
     }
   
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
@@ -328,7 +336,11 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      m_nodeDeviceMap[a->GetId ()] = devBSecond;
      std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
-     devBSecond->SetQueue (queueA);
+     Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
+     devBSecond->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
      //build connection between two device
      devBFirst->AddDevice (devBSecond);
      devBSecond->AddDevice (devBFirst);
@@ -343,7 +355,11 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      m_nodeDeviceMap[b->GetId ()] = devBFirst;
      std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
-     devBFirst->SetQueue (queueA);
+     Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
+     devBFirst->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
     }
 
   bool useNormalChannel = true;
@@ -436,7 +452,11 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      m_nodeDeviceMap[a->GetId ()] = devA;
      std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
-     devA->SetQueue (queueA);
+     Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
+     devA->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
     }
   
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
@@ -456,7 +476,11 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      m_nodeDeviceMap[b->GetId ()] = devB;
      std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
-     devB->SetQueue (queueA);
+     Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
+     devB->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
     }
 
   //Ptr<PointToPointNetDevice> devA = m_deviceFactory.Create<PointToPointNetDevice> ();
