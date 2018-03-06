@@ -90,6 +90,10 @@ PppHeader::GetSerializedSize (void) const
    {
        return 21; //(2 + 17);
    }
+ else if (m_type == LINKSTATE)
+   {
+       return 31; //(2 + 17);
+   }
  else
    {
        return 19; //(2 + 17);
@@ -122,6 +126,12 @@ PppHeader::Serialize (Buffer::Iterator start) const
       start.WriteU8 (m_channel0);
       start.WriteU8 (m_channel1);
    }
+  
+  if (m_type == LINKSTATE)
+   {
+      WriteTo (start, m_nextHop0);
+      WriteTo (start, m_nextHop1);
+   }
   //NS_LOG_UNCOND ("m_protocol " << m_protocol << "\t" << m_addressSrc << "\t" << m_addressDest );
 }
 
@@ -153,6 +163,12 @@ PppHeader::Deserialize (Buffer::Iterator start)
       m_channel0 = i.ReadU8 ();
       m_channel1 = i.ReadU8 ();
    } 
+  
+  if (m_type == LINKSTATE)
+   {
+      ReadFrom (i, m_nextHop0);
+      ReadFrom (i, m_nextHop1);
+   }
   return i.GetDistanceFrom (start);
   //NS_LOG_UNCOND ("m_protocol " << m_protocol << "\t" << m_addressSrc << "\t" << m_addressDest );
 }
@@ -195,6 +211,18 @@ void
 PppHeader::SetSourceAddre (Mac48Address addr)
 {
   m_addressSrc=addr;
+}
+
+void
+PppHeader::SetNextHop0 (Mac48Address addr)
+{
+  m_nextHop0=addr;
+}
+
+void
+PppHeader::SetNextHop1 (Mac48Address addr)
+{
+  m_nextHop1=addr;
 }
 
 void
@@ -259,6 +287,18 @@ Mac48Address
 PppHeader::GetSourceAddre (void) const
 {
   return m_addressSrc;
+}
+
+Mac48Address
+PppHeader::GetNextHop0 (void) const
+{
+  return m_nextHop0;
+}
+
+Mac48Address
+PppHeader::GetNextHop1 (void) const
+{
+  return m_nextHop1;
 }
 
 Mac48Address

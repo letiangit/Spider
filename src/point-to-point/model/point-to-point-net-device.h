@@ -86,6 +86,7 @@ public:
     #define CHANNELCONF 19
     #define CHANNELACK 33
     #define DATATYPE 49
+    #define LINKSTATE 36 
 
 
     #define CHANNELNOTDEFINED 255
@@ -234,6 +235,7 @@ public:
   //virtual void SendChannelResponse ();
   virtual void SendChannelResponse (Mac48Address dest, uint16_t channel0, uint16_t channel1, bool timeout, uint32_t id);
   virtual void SendChannelACK (Mac48Address dest, uint32_t packetid);
+  virtual void SendLinkStateUpdate ();
   virtual void Forward (Ptr<Packet> packet, uint16_t count);
   virtual void SetUsedChannelInside (uint32_t tx, uint32_t rx);
   virtual void SetUsedChannelOutside (uint32_t tx, uint32_t rx);
@@ -241,8 +243,10 @@ public:
   virtual uint16_t LookupRoutingTable (Mac48Address addr);
   virtual void CreateRoutingTable (void);
   virtual void InitializeTopology (void);
+  virtual void UpdateTopology (Mac48Address src, Mac48Address nexthop0, Mac48Address nexthop1);
   //virtual void SendDataPacket (void);
   virtual Ptr<Packet> PreparePacketToSend (void);
+  virtual void setNextHop1 (Mac48Address addr);
 
 
 
@@ -326,6 +330,7 @@ private:
    * \brief Dispose of the object
    */
   virtual void DoDispose (void);
+  
 
 private:
 
@@ -603,6 +608,10 @@ private:
    uint16_t m_channel0_usedOutside;
    uint16_t m_channel1_usedOutside;        
    Mac48Address m_destAddress;
+   Mac48Address m_destAddressResp;
+   Mac48Address m_destAddressAck;
+   Mac48Address m_nextHop0;
+   Mac48Address m_nextHop1;
    uint32_t m_packetId;
    uint32_t m_ackid;
    uint32_t m_respid;

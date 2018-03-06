@@ -57,6 +57,8 @@ public:
     #define CHANNELCONF 19
     #define CHANNELNOTDEFINED 255
     #define DATATYPE 49
+    #define LINKSTATE 36
+
 
 
   /**
@@ -112,6 +114,8 @@ public:
   void SetTTL (uint8_t ttl);
   void SetID (uint32_t id);
   void SetSourceAddre (Mac48Address addr);
+  void SetNextHop0 (Mac48Address addr);
+  void SetNextHop1 (Mac48Address addr);
   void SetDestAddre (Mac48Address addr);
   
   uint8_t GetType (void) const;
@@ -119,6 +123,8 @@ public:
   uint8_t GetTTL (void) const;
   uint32_t GetID (void) const;
   Mac48Address GetSourceAddre (void) const;
+  Mac48Address GetNextHop0 (void) const;
+  Mac48Address GetNextHop1 (void) const;
   Mac48Address GetDestAddre (void) const;
   
   void SetUsedChannel0(uint8_t channel);
@@ -142,6 +148,9 @@ private:
   Mac48Address m_addressDest;
   uint8_t m_channel0;
   uint8_t m_channel1;
+  Mac48Address m_nextHop0;
+  Mac48Address m_nextHop1;
+  
 };
 
 } // namespace ns3
