@@ -189,6 +189,15 @@ main (int argc, char *argv[])
     }
     
   NS_LOG_UNCOND ("install devicesSet finish " << nodes.Get(Nnodes-1)->GetId () << "\t" << nodes.Get(0)->GetId ()  << ", size " << devicesSet.GetN () );
+  //install GES and LEO
+  NodeContainer nodesGES;
+  nodesGES.Create (1);
+  NetDeviceContainer devicesSetGES;
+  for (uint32_t kk = 0; kk < Nnodes; kk++)
+    {
+        NS_LOG_UNCOND ("install Ges, node  " << kk);
+        devicesSetGES = pointToPoint.InstallGES (nodesGES.Get(0), nodes.Get(kk));
+    }
 
   for (uint32_t kk = 0; kk < NexternalSel; kk++)
     {
@@ -203,10 +212,15 @@ main (int argc, char *argv[])
 
   InternetStackHelper stack;
   stack.Install (nodes);
+  stack.Install (nodesGES);
 
   Ipv4AddressHelper address;
   address.SetBase ("10.1.0.0", "255.255.255.0");
   Ipv4InterfaceContainer interfaces = address.Assign (devicesSet);
+    
+  //for GES
+  address.SetBase ("10.2.0.0", "255.255.255.0");
+  Ipv4InterfaceContainer interfacesGES = address.Assign (devicesSetGES);
   
   std::ofstream myfile;
   std::string dropfile=m_Outputpath;
@@ -214,6 +228,16 @@ main (int argc, char *argv[])
   myfile << "Start channel selection ----------- Nnodes " << Nnodes << ", Ndevice " << devicesSet.GetN () << ", UniChannel " << UniChannel << "\n";
   //myfile << "nodes ----------- Nnodes " << nodes.Get(0)->GetId () << ", device " << nodes.Get(0)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(0)->GetDevice(1)->GetAddress() << "\n";
   myfile.close();
+    
+  for (uint32_t kk = 0; kk < Nnodes; kk++)
+    {
+        NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodes.Get(kk)->GetId () << ", device " << nodes.Get(kk)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(1)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(2)->GetAddress() );
+    }
+    
+  for (uint32_t kk = 0; kk < Nnodes; kk++)
+    {
+        NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodesGES.Get(0)->GetId () << ", device " << nodesGES.Get(0)->GetDevice(kk)->GetAddress()  );
+    }
 
   
   UdpEchoServerHelper echoServer (9);
@@ -234,8 +258,37 @@ main (int argc, char *argv[])
   clientApps.Start (Seconds (2.0));
   clientApps.Stop (Seconds (1000.0));
     
-  //pointToPoint.EnablePcapAll ("secondLe", true);
+  //GES
+    
+  UdpEchoServerHelper echoServerGES (8);
+    
+  ApplicationContainer serverAppsGES = echoServerGES.Install (nodes.Get (10)); //server
+  serverAppsGES.Start (Seconds (1.0));
+  serverAppsGES.Stop (Seconds (1000.0));
+    
+  UdpEchoClientHelper echoClientGES (interfacesGES.GetAddress (21), 8); //device of server
+    
+  echoClientGES.SetAttribute ("MaxPackets", UintegerValue (1000));
+  echoClientGES.SetAttribute ("Interval", TimeValue (Seconds (100.0)));
+  echoClientGES.SetAttribute ("PacketSize", UintegerValue (1000));
+    
+    
+  ApplicationContainer clientAppsGES = echoClientGES.Install (nodesGES.Get (0)); //client
+  clientAppsGES.Start (Seconds (2.0));
+  clientAppsGES.Stop (Seconds (1000.0));
+    
   Simulator::Stop (Seconds (1000.0));
+    //
+    
+    for (uint32_t kk = 0; kk < 2*Nnodes; kk++)
+    {
+        
+        NS_LOG_UNCOND( "devicesSetGES " << devicesSetGES.GetN () );
+
+        //NS_LOG_UNCOND( "interfacesGES.GetAddress " << interfaces.GetAddress (kk)  );
+
+        NS_LOG_UNCOND( "interfacesGES.GetAddress " << interfacesGES.GetAddress (kk)  );
+    }
     
   NS_LOG_UNCOND ("install devicesSet finish ....."  );
 

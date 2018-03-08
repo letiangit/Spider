@@ -158,6 +158,7 @@ PointToPointChannel::TransmitStart (
   return true;
 }
 
+
 uint32_t 
 PointToPointChannel::GetNDevices (void) const
 {

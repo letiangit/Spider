@@ -39,6 +39,7 @@ class Queue;
 class NetDevice;
 class Node;
 class PointToPointNetDevice;
+class PointToPointNetDeviceGES;
 
 /**
  * \brief Build a set of PointToPointNetDevice objects
@@ -131,6 +132,7 @@ public:
   NetDeviceContainer Install (Ptr<Node> a, Ptr<Node> b);
   NetDeviceContainer InstallUni (Ptr<Node> a, Ptr<Node> b);
   NetDeviceContainer InstallBi (Ptr<Node> a, Ptr<Node> b);
+  NetDeviceContainer InstallGES (Ptr<Node> a, Ptr<Node> b);
 
 
   /**
@@ -193,8 +195,10 @@ private:
 
   ObjectFactory m_queueFactory;         //!< Queue Factory
   ObjectFactory m_channelFactory;       //!< Channel Factory
+  ObjectFactory m_channelGESFactory;       //!< Channel Factory
   ObjectFactory m_remoteChannelFactory; //!< Remote Channel Factory
   ObjectFactory m_deviceFactory;        //!< Device Factory
+  ObjectFactory m_deviceGESFactory;        //!< Device Factory
   
   
   std::list< Ptr<Node> > m_nodeList;
@@ -214,6 +218,8 @@ private:
   Ptr<PointToPointNetDevice> devBSecond;
   
   NetDeviceContainer container;
+  NetDeviceContainer m_containerGES;
+
 };
 
 } // namespace ns3

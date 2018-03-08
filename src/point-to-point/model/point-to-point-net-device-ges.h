@@ -16,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef POINT_TO_POINT_NET_DEVICE_H
-#define POINT_TO_POINT_NET_DEVICE_H
+#ifndef POINT_TO_POINT_NET_DEVICE_GES_H
+#define POINT_TO_POINT_NET_DEVICE_GES_H
 
 #include <cstring>
 #include "ns3/address.h"
@@ -30,35 +30,15 @@
 #include "ns3/data-rate.h"
 #include "ns3/ptr.h"
 #include "ns3/mac48-address.h"
-#include "ns3/event-id.h"
-#include "ns3/string.h"
-#include "point-to-point-net-device-ges.h"
-
-#include "ns3/spf.h"
-#include <map>
-
+#include "point-to-point-net-device.h"
 
 namespace ns3 {
 
-
-    
-//const uint32_t ChannelResp_delay = 21; // second
-//const uint32_t ChannelConf_delay = 17; //
-//const Time Channel_delay_packet = Seconds (1); // one packet
-//const Time ChannelWaiting_Interval = Seconds (1); // 4  channel
-//const uint32_t CCmin = 1 ;
-//const uint32_t CCmax = 100;
-const uint32_t backoffcounter = 20;
-
 class Queue;
-class PointToPointChannel;
-class PointToPointNetDeviceGES;
+class PointToPointChannelGES;
+class PointToPointNetDevice;
 
 class ErrorModel;
-class UniformRandomVariable;
-
-
-
 
 /**
  * \defgroup point-to-point Point-To-Point Network Device
@@ -71,35 +51,20 @@ class UniformRandomVariable;
 
 /**
  * \ingroup point-to-point
- * \class PointToPointNetDevice
+ * \class PointToPointNetDeviceGES
  * \brief A Device for a Point to Point Network Link.
  *
- * This PointToPointNetDevice class specializes the NetDevice abstract
+ * This PointToPointNetDeviceGES class specializes the NetDevice abstract
  * base class.  Together with a PointToPointChannel (and a peer 
- * PointToPointNetDevice), the class models, with some level of 
+ * PointToPointNetDeviceGES), the class models, with some level of 
  * abstraction, a generic point-to-point or serial link.
  * Key parameters or objects that can be specified for this device 
  * include a queue, data rate, and interframe transmission gap (the 
  * propagation delay is set in the PointToPointChannel).
  */
-class PointToPointNetDevice : public NetDevice
+class PointToPointNetDeviceGES : public NetDevice
 {
 public:
-    #define CHANNELREQ 17
-    #define CHANNELRESP 18
-    #define CHANNELCONF 19
-    #define CHANNELACK 33
-    #define DATATYPE 49
-    #define LINKSTATE 36 
-
-
-    #define CHANNELNOTDEFINED 255
-
-    #define CHANNELNUMBER 4
-    //#define PACKETREPEATNUMBER 4
-    
-    #define V 22
-
   /**
    * \brief Get the TypeId
    *
@@ -108,20 +73,20 @@ public:
   static TypeId GetTypeId (void);
 
   /**
-   * Construct a PointToPointNetDevice
+   * Construct a PointToPointNetDeviceGES
    *
-   * This is the constructor for the PointToPointNetDevice.  It takes as a
+   * This is the constructor for the PointToPointNetDeviceGES.  It takes as a
    * parameter a pointer to the Node to which this device is connected, 
    * as well as an optional DataRate object.
    */
-  PointToPointNetDevice ();
+  PointToPointNetDeviceGES ();
 
   /**
-   * Destroy a PointToPointNetDevice
+   * Destroy a PointToPointNetDeviceGES
    *
-   * This is the destructor for the PointToPointNetDevice.
+   * This is the destructor for the PointToPointNetDeviceGES.
    */
-  virtual ~PointToPointNetDevice ();
+  virtual ~PointToPointNetDeviceGES ();
 
   /**
    * Set the Data Rate used for transmission of packets.  The data rate is
@@ -146,21 +111,17 @@ public:
    * \param ch Ptr to the channel to which this object is being attached.
    * \return true if the operation was successfull (always true actually)
    */
-  //bool Attach (Ptr<PointToPointChannel> ch);
-  bool Attach (Ptr<PointToPointChannel> ch);
-  bool Attach (Ptr<PointToPointChannel> ch, uint16_t rx);
-
+  bool Attach (Ptr<PointToPointChannelGES> ch);
 
   /**
-   * Attach a queue to the PointToPointNetDevice.
+   * Attach a queue to the PointToPointNetDeviceGES.
    *
-   * The PointToPointNetDevice "owns" a queue that implements a queueing 
+   * The PointToPointNetDeviceGES "owns" a queue that implements a queueing 
    * method such as DropTailQueue or RedQueue
    *
    * \param queue Ptr to the new queue.
    */
-  void SetQueue (Ptr<Queue> queue, Ptr<Queue> queueCritical, Ptr<Queue> queuehighPri, Ptr<Queue> queueBestEff, Ptr<Queue> queueBackGround); 
-  void SetQueue (Ptr<Queue> queue); 
+  void SetQueue (Ptr<Queue> queue);
 
   /**
    * Get a copy of the attached Queue.
@@ -170,9 +131,9 @@ public:
   Ptr<Queue> GetQueue (void) const;
 
   /**
-   * Attach a receive ErrorModel to the PointToPointNetDevice.
+   * Attach a receive ErrorModel to the PointToPointNetDeviceGES.
    *
-   * The PointToPointNetDevice may optionally include an ErrorModel in
+   * The PointToPointNetDeviceGES may optionally include an ErrorModel in
    * the packet receive chain.
    *
    * \param em Ptr to the ErrorModel.
@@ -182,7 +143,7 @@ public:
   /**
    * Receive a packet from a connected PointToPointChannel.
    *
-   * The PointToPointNetDevice receives packets from its connected channel
+   * The PointToPointNetDeviceGES receives packets from its connected channel
    * and forwards them up the protocol stack.  This is the public method
    * used by the channel to indicate that the last bit of a packet has 
    * arrived at the device.
@@ -190,11 +151,6 @@ public:
    * \param p Ptr to the received packet.
    */
   void Receive (Ptr<Packet> p);
-  void ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel);
-  void WaitChannel ();
-  void ChangeTxChannel ();
-  void Reset ();
-
 
   // The remaining methods are documented in ns3::NetDevice*
 
@@ -217,10 +173,6 @@ public:
   typedef void (* LinkChangeTracedCallback) (void);
   
   virtual void AddLinkChangeCallback (Callback<void> callback);
-  virtual void TryToSetLinkChannel (void);
-  virtual void TryToSetLinkChannelFromInside (uint32_t tx, uint32_t rx);
-  virtual void TryToSetLinkChannelExternal (void);
-  
 
   virtual bool IsBroadcast (void) const;
   virtual Address GetBroadcast (void) const;
@@ -232,38 +184,7 @@ public:
   virtual bool IsBridge (void) const;
 
   virtual bool Send (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber);
-  virtual bool SendFromInside (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber, bool fromUppper);
-  virtual bool SendChannelSelection (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber);
   virtual bool SendFrom (Ptr<Packet> packet, const Address& source, const Address& dest, uint16_t protocolNumber);
-  virtual void SendChannelRequest (void);
-  //virtual void SendChannelResponse ();
-  virtual void SendChannelResponse (Mac48Address dest, uint16_t channel0, uint16_t channel1, bool timeout, uint32_t id);
-  virtual void SendChannelACK (Mac48Address dest, uint32_t packetid);
-  virtual void SendLinkStateUpdate ();
-  virtual void Forward (Ptr<Packet> packet, uint16_t count);
-  virtual void SetUsedChannelInside (uint32_t tx, uint32_t rx);
-  virtual void SetUsedChannelOutside (uint32_t tx, uint32_t rx);
-  virtual bool Constrainthold (void);
-  virtual uint16_t LookupRoutingTable (Mac48Address addr);
-  virtual void CreateRoutingTable (void);
-  virtual void InitializeTopology (void);
-  virtual void UpdateTopology (Mac48Address src, Mac48Address nexthop0, Mac48Address nexthop1);
-  //virtual void SendDataPacket (void);
-  virtual Ptr<Packet> PreparePacketToSend (void);
-  virtual void setNextHop1 (Mac48Address addr);
-
-
-
-
-
-
-  virtual void SendChannelRequestPacket (uint16_t counter);
-  virtual void SendChannelResponsePacket (uint16_t counter);
-  virtual void AddDevice (Ptr<PointToPointNetDevice> dev);
-  void AddGESDevice (Ptr<PointToPointNetDeviceGES> dev);
-
-
-
 
   virtual Ptr<Node> GetNode (void) const;
   virtual void SetNode (Ptr<Node> node);
@@ -276,7 +197,10 @@ public:
 
   virtual void SetPromiscReceiveCallback (PromiscReceiveCallback cb);
   virtual bool SupportsSendFrom (void) const;
-  virtual void  Cancel4Events ();
+  void AddDevice0 (Ptr<PointToPointNetDevice> dev);
+  void AddDevice1 (Ptr<PointToPointNetDevice> dev);
+  
+  //PointToPointNetDeviceGES& operator = (const PointToPointNetDeviceGES &o);
 
 protected:
   /**
@@ -287,31 +211,6 @@ protected:
   void DoMpiReceive (Ptr<Packet> p);
 
 private:
-    
-   enum LinkChannelState
-    {          
-       NO_CHANNEL_CONNECTED,
-       EXTERNAL_CHANNEL_COMMAND,
-       EXTERNAL_SEND_CHANNEL_REQ,
-       EXTERNAL_REC_CHANNEL_RESP,
-       EXTERNAL_SEND_CHANNEL_ACK, // nearly
-       EXTERNAL_REC_CHANNEL_REQ,
-       EXTERNAL_SEND_CHANNEL_RESP,
-       EXTERNAL_REC_CHANNEL_ACK,
-       INTERNAL_REC_CHANNEL_REQ,
-       INTERNAL_SEND_CHANNEL_RESP,
-       INTERNAL_REC_CHANNEL_ACK,
-       INTERNAL_SEND_CHANNEL_REQ,   // nearly
-       INTERNAL_REC_CHANNEL_RESP,
-       INTERNAL_SEND_CHANNEL_ACK
-    };
-
-    
-    LinkChannelState m_state;
-    
-    virtual void SetState (LinkChannelState state);
-    //virtual LinkChannelState GetState (void) const;
-
 
   /**
    * \brief Assign operator
@@ -322,7 +221,6 @@ private:
    * \return New instance of the NetDevice
    */
   PointToPointNetDeviceGES& operator = (const PointToPointNetDeviceGES &o);
-  PointToPointNetDevice& operator = (const PointToPointNetDevice &o);
 
   /**
    * \brief Copy constructor
@@ -331,13 +229,12 @@ private:
 
    * \param o Other NetDevice
    */
-  PointToPointNetDevice (const PointToPointNetDevice &o);
+  PointToPointNetDeviceGES (const PointToPointNetDeviceGES &o);
 
   /**
    * \brief Dispose of the object
    */
   virtual void DoDispose (void);
-  
 
 private:
 
@@ -354,7 +251,6 @@ private:
    * \param protocolNumber protocol number
    */
   void AddHeader (Ptr<Packet> p, uint16_t protocolNumber);
-  void AddHeaderChannel (Ptr<Packet> p, uint16_t protocolNumber);
 
   /**
    * Removes, from a packet of data, all headers and trailers that
@@ -370,7 +266,7 @@ private:
    * Start Sending a Packet Down the Wire.
    *
    * The TransmitStart method is the method that is used internally in the
-   * PointToPointNetDevice to begin the process of sending a packet out on
+   * PointToPointNetDeviceGES to begin the process of sending a packet out on
    * the channel.  The corresponding method is called on the channel to let
    * it know that the physical device this class represents has virtually
    * started sending signals.  An event is scheduled for the time at which
@@ -397,6 +293,8 @@ private:
    * It calls also the linkChange callback.
    */
   void NotifyLinkUp (void);
+ 
+
 
   /**
    * Enumeration of the states of the transmit machine of the net device.
@@ -424,18 +322,14 @@ private:
   Time           m_tInterframeGap;
 
   /**
-   * The PointToPointChannel to which this PointToPointNetDevice has been
+   * The PointToPointChannel to which this PointToPointNetDeviceGES has been
    * attached.
    */
-  //Ptr<PointToPointChannel> m_channel;
-  Ptr<PointToPointChannel> m_channel;
-  Ptr<PointToPointChannel> m_channelRx;
-
-
+  Ptr<PointToPointChannelGES> m_channel;
 
   /**
-   * The Queue which this PointToPointNetDevice uses as a packet source.
-   * Management of this Queue has been delegated to the PointToPointNetDevice
+   * The Queue which this PointToPointNetDeviceGES uses as a packet source.
+   * Management of this Queue has been delegated to the PointToPointNetDeviceGES
    * and it has the responsibility for deletion.
    * \see class DropTailQueue
    */
@@ -445,8 +339,6 @@ private:
    * Error model for receive packet events
    */
   Ptr<ErrorModel> m_receiveErrorModel;
-  uint32_t m_linkchannelRx;
-  uint32_t m_linkchannelTx;
 
   /**
    * The trace source fired when packets come into the "top" of the device
@@ -592,71 +484,12 @@ private:
    * \return The corresponding PPP protocol number
    */
   static uint16_t EtherToPpp (uint16_t protocol);
-  typedef std::map<uint8_t, Ptr<Queue> > Queues;
-  Queues m_queueMap;
   
-  ObjectFactory m_queueFactory;         //!< Queue Factory
-
-
-  
-   EventId m_watingChannelRespEvent;
-   EventId m_watingChannelConfEvent;
-   EventId m_WaitChannelEvent;
-   EventId m_SendChannelRequestPacketEvent;
-   EventId m_SendChannelResponsePacketEvent;
-   EventId m_watingChannelForwardEvent;
-   EventId m_ResetTimeOutEvent;
-   Ptr< UniformRandomVariable > m_rng;
-   uint16_t m_type;
-   //uint16_t m_channel0_used;
-   //uint16_t m_channel1_used;
-   uint16_t m_channel0_usedInside;
-   uint16_t m_channel1_usedInside;
-   uint16_t m_channel0_usedOutside;
-   uint16_t m_channel1_usedOutside;        
-   Mac48Address m_destAddress;
-   Mac48Address m_destAddressResp;
-   Mac48Address m_destAddressAck;
-   Mac48Address m_nextHop0;
-   Mac48Address m_nextHop1;
-   uint32_t m_packetId;
-   uint32_t m_ackid;
-   uint32_t m_respid;
-   uint32_t m_reqid;
-   
-   Time ChannelResp_delay; 
-   Time ChannelConf_delay; 
-   Time Channel_delay_packet; 
-   Time ChannelWaiting_Interval; 
-   uint32_t CCmax;
-   uint32_t backoffcounter;
-   Ptr<PointToPointNetDevice> m_DevSameNode;
-   Ptr<PointToPointNetDeviceGES> m_GESSameNode;
-   Time m_SendChannelResponsePacketTime;
-   Time m_SendChannelRequestPacketTime;
-   
-   Time  m_watingChannelRespTime;  
-   Time  m_watingChannelConfTime; 
-   bool m_externalChSel;
-   bool selectedTraced;
-   uint16_t PACKETREPEATNUMBER;
-   std::string  m_outputpath;
-
-   
-   
-   typedef void (* ChannelSelectedCallback)
-    (const Mac48Address addr, const Time ts, const uint32_t rx,
-     const uint32_t tx);
-     
-    TracedCallback<Mac48Address, Time, uint32_t, uint32_t > m_channelSelected;
-    
-    uint32_t Topology[V][V];
-    ShortPath  CalPath;
-    uint32_t * tablePoint;
-    uint8_t m_Qos;
+  Ptr<PointToPointNetDevice> m_DevSameNode0;
+  Ptr<PointToPointNetDevice> m_DevSameNode1;
 
 };
 
 } // namespace ns3
 
-#endif /* POINT_TO_POINT_NET_DEVICE_H */
+#endif /* POINT_TO_POINT_NET_DEVICE_GES_H */

@@ -26,6 +26,7 @@
 #include "ns3/uinteger.h"
 #include "ns3/pointer.h"
 #include "point-to-point-net-device.h"
+#include "point-to-point-net-device-ges.h"
 #include "point-to-point-channel.h"
 #include "ppp-header.h"
 #include "ns3/boolean.h"
@@ -2239,12 +2240,15 @@ PointToPointNetDevice::Send (
   NS_LOG_LOGIC ("p=" << packet << ", dest=" << &dest);
   NS_LOG_LOGIC ("UID is " << packet->GetUid ());
   
+  NS_LOG_UNCOND (Simulator::Now() <<" send data packet, " << GetAddress () << " to "  << dest);
+
+  
   if ( m_state != EXTERNAL_REC_CHANNEL_ACK && m_state != INTERNAL_SEND_CHANNEL_ACK && m_state != EXTERNAL_SEND_CHANNEL_ACK )
   {
       NS_LOG_DEBUG (Simulator::Now() <<" drop data packet, " << GetAddress () << ", since channel is not selected "  );
       return false;  
   }
-  NS_LOG_DEBUG (Simulator::Now() <<" \t " << GetAddress () << ", send data packet to " << dest << ", size " << packet->GetSize() << ", protocolNumber " << protocolNumber << "\t" << GetBroadcast ());
+  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send data packet to " << dest << ", size " << packet->GetSize() << ", protocolNumber " << protocolNumber << "\t" << GetBroadcast ());
   m_destAddress = Mac48Address::ConvertFrom (dest);
   LlcSnapHeader llc_test;
   if (packet->PeekHeader (llc_test))
@@ -2516,4 +2520,11 @@ PointToPointNetDevice::AddDevice (Ptr<PointToPointNetDevice> dev)
 }
 
 
+void
+PointToPointNetDevice::AddGESDevice (Ptr<PointToPointNetDeviceGES> deva)
+{
+  m_GESSameNode = deva;
+  NS_LOG_UNCOND (GetAddress () << " has GESDEVICE " << m_GESSameNode->GetAddress() );
+}
+ 
 } // namespace ns3

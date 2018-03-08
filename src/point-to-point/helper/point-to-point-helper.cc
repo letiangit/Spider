@@ -35,6 +35,15 @@
 #include "point-to-point-helper.h"
 
 #include <algorithm>    // std::find
+#include "ns3/point-to-point-net-device-ges.h"
+#include "ns3/point-to-point-channel-ges.h"
+#include "ns3/ppp-header.h"
+#include "ns3/spf.h"
+
+
+
+
+
 
 namespace ns3 {
 
@@ -44,7 +53,9 @@ PointToPointHelper::PointToPointHelper ()
 {
   m_queueFactory.SetTypeId ("ns3::DropTailQueue");
   m_deviceFactory.SetTypeId ("ns3::PointToPointNetDevice");
+  m_deviceGESFactory.SetTypeId ("ns3::PointToPointNetDeviceGES");
   m_channelFactory.SetTypeId ("ns3::PointToPointChannel");
+  m_channelGESFactory.SetTypeId ("ns3::PointToPointChannelGES");
   m_remoteChannelFactory.SetTypeId ("ns3::PointToPointRemoteChannel");
 }
 
@@ -426,6 +437,11 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
 }
 
 
+
+//installation happens after the LEO installation is done.
+
+
+
 NetDeviceContainer 
 PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
 {
@@ -556,6 +572,111 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      m_containerUni.Add (devB);
     }
   return m_containerUni;
+}
+
+
+//happens after leo device is installed
+NetDeviceContainer
+PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
+{            
+  Ptr<PointToPointNetDeviceGES> devA = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
+  devA->IsBroadcast ();
+  devA->SetAddress (Mac48Address::Allocate ());
+  a->AddDevice (devA);
+
+  uint16_t Ndevice; 
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
+  if (m_nodeListIterator == m_nodeList.end())
+   {
+       m_nodeList.push_back(a);
+   }
+  Ndevice = a->GetNDevices ();
+  NS_LOG_UNCOND (a->GetId () << " GES station has device " << Ndevice);
+ 
+  if (Ndevice > 0) //add leo device to ges
+    {
+        // node a is GES station, only has GES device
+    }
+  else
+   {
+      NS_ASSERT ("incorrect device number");
+   } 
+  
+  Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+  devA->SetQueue (queueA);
+
+  
+  Ptr<PointToPointNetDeviceGES> devB = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
+  devB->SetAddress (Mac48Address::Allocate ());
+  b->AddDevice (devB);
+  
+  Ndevice = b->GetNDevices ();
+  NS_LOG_UNCOND (b->GetId () << " leo station has device " << Ndevice);
+  
+  m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
+  if (m_nodeListIterator == m_nodeList.end())
+   {
+       m_nodeList.push_back(b);
+   }
+  
+  if (Ndevice > 0) //add leo device to ges
+    {
+        // node b is LEO station, only has GES device and LEO device
+        Ptr<PointToPointNetDevice> dev0  = m_nodeDeviceMap.find (b->GetId ())->second;
+        devB->AddDevice0 (dev0);
+        dev0->AddGESDevice (devB);
+    }
+  else
+   {
+      NS_ASSERT ("incorrect device number");
+   } 
+  
+    
+  Ptr<Queue> queueB = m_queueFactory.Create<Queue> ();
+  devB->SetQueue (queueB);
+  // If MPI is enabled, we need to see if both nodes have the same system id 
+  // (rank), and the rank is the same as this instance.  If both are true, 
+  //use a normal p2p channel, otherwise use a remote channel
+  bool useNormalChannel = true;
+  //Ptr<PointToPointChannel> channel = 0;
+  Ptr<PointToPointChannelGES> channel = 0;
+
+  if (MpiInterface::IsEnabled ())
+    {
+      uint32_t n1SystemId = a->GetSystemId ();
+      uint32_t n2SystemId = b->GetSystemId ();
+      uint32_t currSystemId = MpiInterface::GetSystemId ();
+      if (n1SystemId != currSystemId || n2SystemId != currSystemId) 
+        {
+          useNormalChannel = false;
+        }
+      NS_LOG_UNCOND ("MpiInterface::IsEnabled");
+    }
+  if (useNormalChannel)
+    {
+      //channel = m_channelFactory.Create<PointToPointChannel> ();
+      channel = m_channelGESFactory.Create<PointToPointChannelGES> ();
+    }
+  /*else
+    {
+      channel = m_remoteChannelFactory.Create<PointToPointRemoteChannel> ();
+      Ptr<MpiReceiver> mpiRecA = CreateObject<MpiReceiver> ();
+      Ptr<MpiReceiver> mpiRecB = CreateObject<MpiReceiver> ();
+      mpiRecA->SetReceiveCallback (MakeCallback (&PointToPointNetDevice::Receive, devA));
+      mpiRecB->SetReceiveCallback (MakeCallback (&PointToPointNetDevice::Receive, devB));
+      devA->AggregateObject (mpiRecA);
+      devB->AggregateObject (mpiRecB);
+    } */
+
+    
+  devA->Attach (channel);
+  devB->Attach (channel);
+  m_containerGES.Add (devA);
+  m_containerGES.Add (devB);
+  
+  NS_LOG_UNCOND ("... ...");
+
+  return m_containerGES; 
 }
 
 
