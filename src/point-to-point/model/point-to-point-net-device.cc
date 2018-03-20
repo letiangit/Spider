@@ -243,6 +243,7 @@ PointToPointNetDevice::PointToPointNetDevice ()
     m_channel1_usedOutside (CHANNELNOTDEFINED),
     PACKETREPEATNUMBER (4),
     selectedTraced (false),
+    m_GESSameNodeFlag (false),
     m_packetId (0),
     m_reqid (0),
     m_nextHop0( Mac48Address::ConvertFrom (GetBroadcast() )),
@@ -328,6 +329,7 @@ PointToPointNetDevice::AddHeader (Ptr<Packet> p, uint16_t protocolNumber)
   ppp.SetSourceAddre (Mac48Address::ConvertFrom (GetAddress ()));
   ppp.SetDestAddre (m_destAddress);
   ppp.SetQos (m_Qos);
+  ppp.SetTTL (0);
   NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress () << " add header to " << m_destAddress);
 
   
@@ -500,7 +502,7 @@ PointToPointNetDevice::TransmitStart (Ptr<Packet> p)
   m_phyTxBeginTrace (m_currentPkt);
 
   Time txTime = m_bps.CalculateBytesTxTime (p->GetSize ());
-  NS_LOG_UNCOND ("SIZE " << p->GetSize () << ", txTime " << txTime);
+  //NS_LOG_UNCOND ("SIZE " << p->GetSize () << ", txTime " << txTime);
   Time txCompleteTime = txTime + m_tInterframeGap;
 
   NS_LOG_LOGIC ("Schedule TransmitCompleteEvent in " << txCompleteTime.GetSeconds () << "sec");
@@ -551,7 +553,6 @@ PointToPointNetDevice::TransmitComplete (void)
   m_snifferTrace (p);
   m_promiscSnifferTrace (p);
   NS_LOG_DEBUG ("TransmitComplete");
-  NS_LOG_UNCOND ("TransmitComplete");
   TransmitStart (p);
 }
 /*
@@ -667,7 +668,7 @@ PointToPointNetDevice::SetReceiveErrorModel (Ptr<ErrorModel> em)
 void
 PointToPointNetDevice::WaitChannel ()
 {
-   NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress ()  <<  " WaitChannel ");   
+   NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress ()  <<  " WaitChannel ");   
   uint16_t repetition = 0;  
   while (1)
    {
@@ -723,9 +724,9 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
       }
     
     
-      NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << "...received linkchannel " << linkchannel << ", m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx <<
+      NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress () << "...received linkchannel " << linkchannel << ", m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx <<
           ", src  " << ppp.GetSourceAddre ());  
-      NS_LOG_UNCOND (", nexthop0 " << ppp.GetNextHop0 () << ", nexthop1 " << ppp.GetNextHop1 ());
+      NS_LOG_DEBUG (", nexthop0 " << ppp.GetNextHop0 () << ", nexthop1 " << ppp.GetNextHop1 ());
 
     
     for (uint16_t i=0; i<100; i++)
@@ -745,9 +746,9 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
    //mimic the real link channel   
    if (m_WaitChannelEvent.IsRunning())
     {
-       NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << "..received linkchannel " << linkchannel << ", m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx);  
+       NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress () << "..received linkchannel " << linkchannel << ", m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx);  
        m_WaitChannelEvent.Cancel ();
-       NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << "..received linkchannel " << linkchannel << ", m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx);  
+       NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress () << "..received linkchannel " << linkchannel << ", m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx);  
         
         if (m_linkchannelRx == m_linkchannelTx || m_linkchannelRx == m_channel0_usedInside)
             {
@@ -792,7 +793,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
                    return;
               }
              
-             NS_LOG_UNCOND (Simulator::Now() << "\t" << m_DevSameNode->GetAddress () << " internal update link state of " << ppp.GetSourceAddre () << ", nexthop0 " << ppp.GetNextHop0 () << ", nexthop1 " << ppp.GetNextHop1 ());
+             NS_LOG_DEBUG (Simulator::Now() << "\t" << m_DevSameNode->GetAddress () << " internal update link state of " << ppp.GetSourceAddre () << ", nexthop0 " << ppp.GetNextHop0 () << ", nexthop1 " << ppp.GetNextHop1 ());
              m_DevSameNode->UpdateTopology (ppp.GetSourceAddre (), ppp.GetNextHop0 (), ppp.GetNextHop1 ());
              m_DevSameNode->Forward (packet, PACKETREPEATNUMBER-1);  
             }
@@ -805,13 +806,13 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
            if (ppp.GetType () == CHANNELRESP &&  m_nextHop0 == Mac48Address::ConvertFrom (GetBroadcast() ) )
             {
                 m_nextHop0 = ppp.GetSourceAddre ();
-                NS_LOG_UNCOND ("CHANNELRESP " << GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
+                NS_LOG_DEBUG ("CHANNELRESP " << GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
 
             }
            else if (ppp.GetType () == CHANNELREQ &&  m_nextHop1 == Mac48Address::ConvertFrom (GetBroadcast() ) )
             {
                 m_nextHop1 = ppp.GetSourceAddre ();
-                NS_LOG_UNCOND ("CHANNELREQ " << GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
+                NS_LOG_DEBUG ("CHANNELREQ " << GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
             }
         }
        else
@@ -820,7 +821,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
             {
                 m_nextHop0 = ppp.GetSourceAddre ();
                 m_DevSameNode->setNextHop1( Mac48Address::ConvertFrom(GetAddress ()) );
-                //NS_LOG_UNCOND (GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
+                //NS_LOG_DEBUG (GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
             }
         }
     }
@@ -855,7 +856,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
        else if (ppp.GetType () == LINKSTATE)
         {
             //SendChannelRequest ();
-            NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " update link state of " << ppp.GetSourceAddre () << ", nexthop0 " << ppp.GetNextHop0 () << ", nexthop1 " << ppp.GetNextHop1 ());
+            NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " update link state of " << ppp.GetSourceAddre () << ", nexthop0 " << ppp.GetNextHop0 () << ", nexthop1 " << ppp.GetNextHop1 ());
             UpdateTopology (ppp.GetSourceAddre (), ppp.GetNextHop0 (), ppp.GetNextHop1 ());
         }
        else if (ppp.GetType () == DATATYPE)
@@ -897,7 +898,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
            {
                SetState (EXTERNAL_REC_CHANNEL_RESP);
                SetState (EXTERNAL_SEND_CHANNEL_ACK);
-               NS_LOG_UNCOND (GetAddress ()  <<  " EXTERNAL_SEND_CHANNEL_ACK,  channel nearly selected, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
+               NS_LOG_DEBUG (GetAddress ()  <<  " EXTERNAL_SEND_CHANNEL_ACK,  channel nearly selected, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
                NS_LOG_DEBUG (GetAddress ()  <<  " send SendChannelACK " );  
                
                SendChannelACK (ppp.GetSourceAddre (), ppp.GetID ());
@@ -949,7 +950,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
       else if (ppp.GetType () == LINKSTATE)
         {
             //SendChannelRequest ();
-            NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " update link state of " << ppp.GetSourceAddre () << ", nexthop0 " << ppp.GetNextHop0 ());
+            NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " update link state of " << ppp.GetSourceAddre () << ", nexthop0 " << ppp.GetNextHop0 ());
             UpdateTopology (ppp.GetSourceAddre (), ppp.GetNextHop0 (), ppp.GetNextHop1 ());
         }
       else if (ppp.GetType () == DATATYPE)
@@ -967,13 +968,13 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
        if (ppp.GetType () == CHANNELACK && m_respid == ppp.GetID())
          {
            SetState (EXTERNAL_REC_CHANNEL_ACK);
-           NS_LOG_UNCOND (GetAddress ()  <<  " set EXTERNAL_REC_CHANNEL_ACK, CHANNEL SELECTED, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
+           NS_LOG_DEBUG (GetAddress ()  <<  " set EXTERNAL_REC_CHANNEL_ACK, CHANNEL SELECTED, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
            if (!selectedTraced)
             {
                 m_channelSelected (Mac48Address::ConvertFrom(GetAddress ()), Simulator::Now (), m_linkchannelRx, m_linkchannelTx);
                 selectedTraced = true;
                 CreateRoutingTable ();
-                NS_LOG_UNCOND (GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
+                NS_LOG_DEBUG (GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
             }
            Cancel4Events ();
            if (! m_channel->IsChannelUni())
@@ -1000,7 +1001,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         {
            SetState (INTERNAL_REC_CHANNEL_ACK);
            SetState (INTERNAL_SEND_CHANNEL_REQ);
-           NS_LOG_UNCOND (GetAddress ()  <<  " INTERNAL_SEND_CHANNEL_REQ,  channel nearly selected, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
+           NS_LOG_DEBUG (GetAddress ()  <<  " INTERNAL_SEND_CHANNEL_REQ,  channel nearly selected, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx );  
 
            //SendChannelRequest ();
            NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " start channel request " );
@@ -1026,13 +1027,13 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
         {
            SetState (INTERNAL_REC_CHANNEL_RESP);
            SetState (INTERNAL_SEND_CHANNEL_ACK);
-           NS_LOG_UNCOND (GetAddress ()  <<  " set INTERNAL_SEND_CHANNEL_ACK, CHANNEL SELECTED, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx ); 
+           NS_LOG_DEBUG (GetAddress ()  <<  " set INTERNAL_SEND_CHANNEL_ACK, CHANNEL SELECTED, m_linkchannelRx " << m_linkchannelRx << ", m_linkchannelTx " << m_linkchannelTx ); 
            if (!selectedTraced)
             {
                 m_channelSelected (Mac48Address::ConvertFrom(GetAddress ()), Simulator::Now (), m_linkchannelRx, m_linkchannelTx);
                 selectedTraced = true;
                 CreateRoutingTable ();
-                NS_LOG_UNCOND (GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
+                NS_LOG_DEBUG (GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
             }
            Cancel4Events ();
            if (! m_channel->IsChannelUni())
@@ -1094,11 +1095,11 @@ PointToPointNetDevice::Cancel4Events ()
 
 }
 
-
+/*
 void
 PointToPointNetDevice::Receive (Ptr<Packet> packet)
 {
-  NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() );
+  NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() );
   NS_LOG_FUNCTION (this << packet);
   uint16_t protocol = 0;
 
@@ -1141,7 +1142,7 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       
       NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
          
-       NS_LOG_DEBUG(Simulator::Now() << "\t" << ", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
 
      if (ppp.GetSourceAddre () == Mac48Address::ConvertFrom (GetAddress() ))
       {
@@ -1160,7 +1161,7 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ) || ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
       {
       m_rxCallback (this, packet, protocol, GetRemote ());
-      }
+      } // Should the two condition be separated? if the packet is for me, there should be no forward
       
       if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ))
       {
@@ -1169,18 +1170,47 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       }
       //NS_LOG_DEBUG ( GetAddress () << "\t" << m_address );
 
-      
+            NS_LOG_UNCOND(Simulator::Now() << "\t" << ", 2 myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+ 
       if (m_channel->IsChannelUni () )
       {
+        if (ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff") && ppp.GetDestAddre () != Mac48Address::ConvertFrom (m_GESSameNode->GetAddress() ) )
+        {
+            m_GESSameNode->m_rxCallback (this, packet, protocol, GetRemote ());
+        }    
+      
+           
         if ( ppp.GetDestAddre () != Mac48Address::ConvertFrom (GetAddress() ))
         {
+                            NS_LOG_UNCOND(", myaddress ...." << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+
          uint16_t nextHop = LookupRoutingTable (ppp.GetDestAddre ());
+                NS_LOG_UNCOND(", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+
+         //no need to use nexthop
          //NS_LOG_DEBUG(ppp.GetDestAddre () << "\t" << GetAddress()  <<  " route to " << nextHop  );
          m_destAddress = ppp.GetDestAddre ();
          //Send (packet, m_destAddress, protocol); // GetBroadcast (), 0x800 are not really used
          
-         Forward (originalPacket, PACKETREPEATNUMBER-1);
+         //Forward (originalPacket, PACKETREPEATNUMBER-1);
          
+         //
+         
+            uint8_t mac[6];
+            m_nextHop0.CopyTo (mac);
+            uint8_t aid_l = mac[5];
+            uint8_t aid_h = mac[4] & 0x1f;
+            uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+    
+         if (aid !=  nextHop)
+            {
+               // (originalPacket, PACKETREPEATNUMBER-1); // allow ges device to send
+               m_GESSameNode->Forward (originalPacket);
+            }
+         else
+            {
+                Forward (originalPacket, PACKETREPEATNUMBER-1);
+            }
        }
       }
       else
@@ -1228,10 +1258,410 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
                 }
                //m_DevSameNode->SendFromInside (packet, m_destAddress, protocol, false);
                m_DevSameNode->Forward (originalPacket, PACKETREPEATNUMBER-1);
+               //allow the other device to transmit, no need to  route
            }
       }
     }
 }
+*/
+
+
+void
+PointToPointNetDevice::Receive (Ptr<Packet> packet)
+{
+  NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() );
+  NS_LOG_FUNCTION (this << packet);
+  uint16_t protocol = 0;
+  
+  
+
+  if (m_receiveErrorModel && m_receiveErrorModel->IsCorrupt (packet) ) 
+    {
+      // 
+      // If we have an error model and it indicates that it is time to lose a
+      // corrupted packet, don't forward this packet up, let it go.
+      //
+      m_phyRxDropTrace (packet);
+    }
+  else 
+    {
+      // 
+      // Hit the trace hooks.  All of these hooks are in the same place in this 
+      // device because it is so simple, but this is not usually the case in
+      // more complicated devices.
+      //
+      m_snifferTrace (packet);
+      m_promiscSnifferTrace (packet);
+      m_phyRxEndTrace (packet);
+      //
+      // Trace sinks will expect complete packets, not packets without some of the
+      // headers.
+      //
+   
+
+
+      //
+      // Strip off the point-to-point protocol header and forward this packet
+      // up the protocol stack.  Since this is a simple point-to-point link,
+      // there is no difference in what the promisc callback sees and what the
+      // normal receive callback sees.
+      //
+      PppHeader ppp;
+      packet->PeekHeader (ppp);
+      uint8_t ttl = ppp.GetTTL ();
+      if (ttl > 12)
+      {
+          NS_LOG_UNCOND ("PACKET DROPPED DUE TO TTL ");
+          return;
+      }
+      else
+      {
+            PppHeader newppp;
+            packet->RemoveHeader (newppp);
+            NS_LOG_UNCOND ("set TTL " << ttl + 1);
+            newppp.SetTTL (ttl + 1);
+            packet->AddHeader (newppp);
+      }
+      
+      Ptr<Packet> originalPacket = packet->Copy ();
+      Ptr<Packet> originalPacket2 = packet->Copy ();
+      Ptr<Packet> originalPacket3 = packet->Copy ();
+      Ptr<Packet> LEOPacket = packet->Copy ();
+             
+       
+  
+      ProcessHeader (packet, protocol);
+            Ptr<Packet> packet2 = packet->Copy ();
+
+      
+      NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+         
+       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+
+     if (ppp.GetSourceAddre () == Mac48Address::ConvertFrom (GetAddress() ))
+      {
+          NS_LOG_DEBUG ("drop packet due to loop" );
+          return;
+      }
+       
+      if (!m_promiscCallback.IsNull ())
+        {
+          m_macPromiscRxTrace (originalPacket);
+          m_promiscCallback (this, packet, protocol, GetRemote (), GetAddress (), NetDevice::PACKET_HOST);
+          NS_LOG_DEBUG (".." << protocol << "\t" << GetRemote () << "\t" << GetAddress () );
+        }
+
+      m_macRxTrace (originalPacket);
+      if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ) || ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
+      {
+      m_rxCallback (this, packet, protocol, GetRemote ());
+       Ptr<Packet> SpiderPacket = packet->Copy ();
+       //m_spiderrxCallback (this, SpiderPacket, protocol, GetRemote ());
+
+      } // Should the two condition be separated? if the packet is for me, there should be no forward
+      
+      if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ))
+      {
+      m_Qos = ppp.GetQos ();
+      NS_LOG_UNCOND ("receive data m_Qos " << uint16_t (m_Qos));
+      }
+      //NS_LOG_DEBUG ( GetAddress () << "\t" << m_address );
+
+            NS_LOG_UNCOND(Simulator::Now() << "\t" << ", 2 myaddress..." << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+
+      if (m_channel->IsChannelUni () )
+      {
+        if (ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff") || ppp.GetDestAddre () == Mac48Address::ConvertFrom (m_GESSameNode->GetAddress() ) )
+        {
+            //NS_LOG_UNCOND(m_GESSameNode->GetAddress () << ", "  << protocol << " to upper layer, GES"  );
+           // m_GESSameNode->m_rxCallback (this, packet2, protocol, GetRemote ());
+            m_GESSameNode->ReceiveFromLEO (LEOPacket);
+        }    
+      
+        if (ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff")  )  
+            {
+           //     m_GESSameNode->Forward (originalPacket);
+                Forward (originalPacket2, PACKETREPEATNUMBER-1);
+            }
+        else if ( ppp.GetDestAddre () != Mac48Address::ConvertFrom (GetAddress() ))
+        {
+                            NS_LOG_UNCOND(", myaddress ...." << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+
+         uint16_t nextHop = LookupRoutingTable (ppp.GetDestAddre ());
+                NS_LOG_UNCOND(", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+
+         //no need to use nexthop
+         //NS_LOG_DEBUG(ppp.GetDestAddre () << "\t" << GetAddress()  <<  " route to " << nextHop  );
+         m_destAddress = ppp.GetDestAddre ();
+         //Send (packet, m_destAddress, protocol); // GetBroadcast (), 0x800 are not really used
+         
+         //Forward (originalPacket, PACKETREPEATNUMBER-1);
+         
+         //
+         
+            uint8_t mac[6];
+            m_nextHop0.CopyTo (mac);
+            uint8_t aid_l = mac[5];
+            uint8_t aid_h = mac[4] & 0x1f;
+            uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+         /*
+         if (aid !=  nextHop)
+            {
+               // (originalPacket, PACKETREPEATNUMBER-1); // allow ges device to send
+              m_GESSameNode->Forward (originalPacket);
+            }
+         else
+            {
+                Forward (originalPacket, PACKETREPEATNUMBER-1);
+            } */ //temperory, as nexthop is not so useful
+           m_GESSameNode->Forward (originalPacket);
+           Forward (originalPacket2, PACKETREPEATNUMBER-1);
+       }
+      }
+     else
+      {
+          if ( ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetBroadcast() ))
+            {
+              NS_LOG_DEBUG("broadcast from outside, transfer to inside");
+              m_destAddress = ppp.GetDestAddre ();
+
+              if ( ppp.GetSourceAddre () == Mac48Address::ConvertFrom (m_DevSameNode->GetAddress()) )
+                {
+                  return;
+                }
+               if (m_destAddress == Mac48Address::ConvertFrom (m_DevSameNode->GetAddress())  || m_destAddress == Mac48Address::ConvertFrom (GetBroadcast ()))
+                {
+                       NS_LOG_DEBUG ("sent to upper layer" );
+                       m_DevSameNode->m_rxCallback (m_DevSameNode, packet, protocol, GetRemote ());
+                       m_DevSameNode->Forward (originalPacket, PACKETREPEATNUMBER-1);
+                }
+              
+              if (m_GESSameNodeFlag &&  (m_destAddress == Mac48Address::ConvertFrom (m_GESSameNode->GetAddress())  || m_destAddress == Mac48Address::ConvertFrom (GetBroadcast ()) ) )
+               {
+                   m_GESSameNode->m_rxCallback (m_DevSameNode, packet, protocol, GetRemote ());
+                   m_GESSameNode->Forward (originalPacket);
+
+               }
+              return;
+            }
+          else if ( ppp.GetDestAddre () != Mac48Address::ConvertFrom (GetAddress() ))
+           {
+               NS_LOG_DEBUG("no broadcast from outside, transfer to inside");
+               m_destAddress = ppp.GetDestAddre ();
+               
+               if ( ppp.GetSourceAddre () == Mac48Address::ConvertFrom (m_DevSameNode->GetAddress()) )
+                {
+                  return;
+                }
+               
+               if (m_destAddress == Mac48Address::ConvertFrom (m_DevSameNode->GetAddress())  )
+                {
+                       NS_LOG_DEBUG ("sent to upper layer" );
+                       m_DevSameNode->m_rxCallback (m_DevSameNode, packet, protocol, GetRemote ());
+                       return;
+                }
+               else if (m_GESSameNodeFlag && m_destAddress == Mac48Address::ConvertFrom (m_GESSameNode->GetAddress()) )
+                {
+                   m_GESSameNode->m_rxCallback (m_DevSameNode, packet, protocol, GetRemote ());
+                   return;
+                }
+               else
+                {
+                    uint16_t nextHop = m_DevSameNode->LookupRoutingTable (ppp.GetDestAddre ());
+                    NS_LOG_DEBUG(ppp.GetDestAddre () << "\t" << GetAddress()  <<  " route to " << nextHop  );
+                    
+                    uint8_t mac[6];
+                    m_DevSameNode->m_nextHop0.CopyTo (mac);
+                    uint8_t aid_l = mac[5];
+                    uint8_t aid_h = mac[4] & 0x1f;
+                    uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+    
+                    if (aid !=  nextHop)
+                       {
+                          m_GESSameNode->Forward (originalPacket);
+                       }
+                    else
+                       {
+                          m_DevSameNode->Forward (originalPacket, PACKETREPEATNUMBER-1);
+                       } 
+                }
+
+           }
+      }
+    }
+}
+ 
+
+void
+PointToPointNetDevice::ReceiveFromGES (Ptr<Packet> packet)
+{
+    
+ if ( m_state != EXTERNAL_REC_CHANNEL_ACK && m_state != INTERNAL_SEND_CHANNEL_ACK && m_state != EXTERNAL_SEND_CHANNEL_ACK )
+  {
+      NS_LOG_DEBUG (Simulator::Now() <<" drop data packet, " << GetAddress () << ", since channel is not selected "  );
+      return;  
+  }
+      
+  NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() );
+  NS_LOG_FUNCTION (this << packet);
+  uint16_t protocol = 0;
+
+  if (m_receiveErrorModel && m_receiveErrorModel->IsCorrupt (packet) ) 
+    {
+      // 
+      // If we have an error model and it indicates that it is time to lose a
+      // corrupted packet, don't forward this packet up, let it go.
+      //
+      m_phyRxDropTrace (packet);
+    }
+  else 
+    {
+      // 
+      // Hit the trace hooks.  All of these hooks are in the same place in this 
+      // device because it is so simple, but this is not usually the case in
+      // more complicated devices.
+      //
+      m_snifferTrace (packet);
+      m_promiscSnifferTrace (packet);
+      m_phyRxEndTrace (packet);
+      //
+      // Trace sinks will expect complete packets, not packets without some of the
+      // headers.
+      //
+
+      //
+      // Strip off the point-to-point protocol header and forward this packet
+      // up the protocol stack.  Since this is a simple point-to-point link,
+      // there is no difference in what the promisc callback sees and what the
+      // normal receive callback sees.
+      //
+      PppHeader ppp;
+      packet->PeekHeader (ppp);
+      
+      uint8_t ttl = ppp.GetTTL ();
+      if (ttl > 12)
+        {
+          NS_LOG_UNCOND ("PACKET DROPPED DUE TO TT--GESL ");
+          return;
+        }
+      else
+        {
+            PppHeader newppp;
+            packet->RemoveHeader (newppp);
+            newppp.SetTTL (ttl + 1);
+            packet->AddHeader (newppp);
+        }
+             
+      Ptr<Packet> originalPacket = packet->Copy ();
+
+  
+      ProcessHeader (packet, protocol);
+      
+         
+       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+
+     if (ppp.GetSourceAddre () == Mac48Address::ConvertFrom (GetAddress() ))
+      {
+          NS_ASSERT ("drop packet due to loop" );
+          return;
+      }
+       
+      if (!m_promiscCallback.IsNull ())
+        {
+          m_macPromiscRxTrace (originalPacket);
+          m_promiscCallback (this, packet, protocol, GetRemote (), GetAddress (), NetDevice::PACKET_HOST);
+          NS_LOG_DEBUG (".." << protocol << "\t" << GetRemote () << "\t" << GetAddress () );
+        }
+
+      m_macRxTrace (originalPacket);
+      if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ) || ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
+      {
+        m_rxCallback (this, packet, protocol, GetRemote ());
+        Ptr<Packet> SpiderPacket = packet->Copy ();
+        //m_spiderrxCallback (this, SpiderPacket, protocol, GetRemote ());
+      } // Should the two condition be separated? if the packet is for me, there should be no forward
+      
+      if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ))
+      {
+        m_Qos = ppp.GetQos ();
+        NS_LOG_UNCOND ("receive data m_Qos " << uint16_t (m_Qos));
+      }
+      //NS_LOG_DEBUG ( GetAddress () << "\t" << m_address );
+
+      NS_LOG_UNCOND(Simulator::Now() << "\t" << ", 2 myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+ 
+      if (m_channel->IsChannelUni () )
+      {          
+        if ( ppp.GetDestAddre () != Mac48Address::ConvertFrom (GetAddress() ))
+        {
+                Forward (originalPacket, PACKETREPEATNUMBER-1);
+        }
+      }
+      else
+      {
+          if ( ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetBroadcast() ))
+            {
+              NS_LOG_DEBUG("broadcast from outside, transfer to inside");
+              m_destAddress = ppp.GetDestAddre ();
+
+              if ( ppp.GetSourceAddre () == Mac48Address::ConvertFrom (m_DevSameNode->GetAddress()) )
+                {
+                  return;
+                }
+      
+                NS_LOG_DEBUG ("sent to upper layer" );
+                m_DevSameNode->m_rxCallback (m_DevSameNode, packet, protocol, GetRemote ());
+                
+                if ( m_destAddress == Mac48Address::ConvertFrom (m_DevSameNode->GetAddress()) )
+                {
+                  return;
+                }
+              //m_DevSameNode->SendFromInside (packet, m_destAddress, protocol, false); 
+              m_DevSameNode->Forward (originalPacket, PACKETREPEATNUMBER-1);
+            }
+          else if ( ppp.GetDestAddre () != Mac48Address::ConvertFrom (GetAddress() ))
+           {
+               NS_LOG_DEBUG("no broadcast from outside, transfer to inside");
+             
+               m_destAddress = ppp.GetDestAddre ();
+               if ( ppp.GetSourceAddre () == Mac48Address::ConvertFrom (m_DevSameNode->GetAddress()) )
+                {
+                  return;
+                }
+               if (m_destAddress == Mac48Address::ConvertFrom (m_DevSameNode->GetAddress()) )
+                {
+                       NS_LOG_DEBUG ("sent to upper layer" );
+                       m_DevSameNode->m_rxCallback (m_DevSameNode, packet, protocol, GetRemote ());
+                       return;
+                }
+               else
+               {     
+                    uint16_t nextHop = LookupRoutingTable (ppp.GetDestAddre ());
+                    NS_LOG_DEBUG(ppp.GetDestAddre () << "\t" << GetAddress()  <<  " route to " << nextHop  );
+                   
+                    uint8_t mac[6];
+                    m_nextHop0.CopyTo (mac);
+                    uint8_t aid_l = mac[5];
+                    uint8_t aid_h = mac[4] & 0x1f;
+                    uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+    
+                    if (aid !=  nextHop)
+                       {
+                          // (originalPacket, PACKETREPEATNUMBER-1); // allow ges device to send
+                          m_DevSameNode->Forward (originalPacket, PACKETREPEATNUMBER-1);
+                       }
+                    else
+                       {
+                          Forward (originalPacket, PACKETREPEATNUMBER-1);
+                       }             
+               }
+           }
+      }
+    }
+  
+  
+}
+
 
 bool
 PointToPointNetDevice::SendFromInside (
@@ -1252,6 +1682,8 @@ PointToPointNetDevice::SendFromInside (
    {
         NS_LOG_DEBUG ("sent to upper layer" );
         m_rxCallback (this, packet, protocolNumber, GetRemote ());
+        Ptr<Packet> SpiderPacket = packet->Copy ();
+        //m_spiderrxCallback (this, SpiderPacket, protocolNumber, GetRemote ());
    }
   
   
@@ -1278,7 +1710,7 @@ PointToPointNetDevice::SendFromInside (
         if (llc_test.GetType () == 2054)
         {
 
-          NS_LOG_DEBUG(" -> Found an ARP packet!");
+          NS_LOG_UNCOND(GetAddress ()  << "  Found an ARP packet!,  size " << packet->GetSize());
         }
   }
  
@@ -1350,8 +1782,8 @@ PointToPointNetDevice::SendLinkStateUpdate ( )
    
    Ptr<Packet> packet = Create<Packet> ();
    m_type = LINKSTATE;
-   //NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " send SendLinkStateUpdate  m_nextHop0 " << m_nextHop0 );
-   NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " send SendLinkStateUpdate  m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 );
+   //NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " send SendLinkStateUpdate  m_nextHop0 " << m_nextHop0 );
+   //NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " send SendLinkStateUpdate  m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 );
          
    AddHeaderChannel (packet, 0x800);
    SendChannelSelection (packet, Mac48Address ("ff:ff:ff:ff:ff:ff"), 0x800); // GetBroadcast (), 0x800 are not really used
@@ -1409,7 +1841,7 @@ PointToPointNetDevice::CreateRoutingTable ()
 void 
 PointToPointNetDevice::InitializeTopology ()
 {
-  NS_LOG_UNCOND ( " InitializeTopology Topology of  " << GetAddress () );
+  NS_LOG_DEBUG ( " InitializeTopology Topology of  " << GetAddress () );
 
   for (uint16_t kk=0; kk < V; kk++) //only for bi
   {
@@ -1421,10 +1853,11 @@ PointToPointNetDevice::InitializeTopology ()
   
   if (m_channel->IsChannelUni ())
   {
-    uint32_t N = 11;  
-    for (uint16_t kk=0; kk < N; kk++) //only for uni
+    //uint32_t Nsatellite = 11;  
+    uint32_t Nsatellite = 11; // two GES satellite
+    for (uint16_t kk=0; kk < Nsatellite; kk++) //only for uni
      {
-      for (uint16_t ii=0; ii < N; ii++)
+      for (uint16_t ii=0; ii < Nsatellite; ii++)
       {
           if (kk == ii)
           {
@@ -1482,6 +1915,83 @@ PointToPointNetDevice::InitializeTopology ()
   }
 }
 
+void 
+PointToPointNetDevice::UpdateTopologyGES ()
+{
+    
+   //for ges
+  static uint16_t   count = 1;
+  uint16_t distanceToGES0 = 0;
+  uint16_t distanceToGES1 = 0;
+
+  
+  
+    Mac48Address addr = Mac48Address::ConvertFrom (GetAddress() );
+    
+    // for test
+    uint8_t mac[6];
+    addr.CopyTo (mac);
+    uint8_t aid_l = mac[5];
+    uint8_t aid_h = mac[4] & 0x1f;
+    uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+  
+
+    if (m_channel->IsChannelUni ())
+        {
+         if (count == aid % 11)
+          {
+               distanceToGES0 = 1;
+           }
+        else
+          {
+              distanceToGES0 = 9999;
+          }
+       }
+    else
+       {
+        //to do, for bidirectional link
+       }
+    
+     if (m_channel->IsChannelUni ())
+        {
+         if (count == aid % 11 + 5 )
+          {
+               distanceToGES1 = 1;
+           }
+        else
+          {
+              distanceToGES1 = 9999;
+          }
+       }
+    else
+       {
+        //to do, for bidirectional link
+       }
+    
+    count++;
+   
+  
+  if (m_channel->IsChannelUni ())
+    {
+      uint32_t Nsatellite = 11;
+      for (uint16_t ii=0; ii < Nsatellite; ii++)
+      {
+        Topology[ii][11] = distanceToGES0;  
+        Topology[ii][12] = distanceToGES1; 
+      }
+    }
+  else
+    {
+      for (uint16_t ii=0; ii < 22; ii++)
+      {
+        Topology[ii][22] = distanceToGES0;   
+        Topology[ii][23] = distanceToGES1; 
+      }
+    }
+  
+   Simulator::Schedule (Seconds(100), &PointToPointNetDevice::UpdateTopologyGES, this);
+     
+}
 
 void 
 PointToPointNetDevice::UpdateTopology (Mac48Address src, Mac48Address nexthop0, Mac48Address nexthop1)
@@ -1513,10 +2023,9 @@ PointToPointNetDevice::UpdateTopology (Mac48Address src, Mac48Address nexthop0, 
   }
   
   
-  
-  NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " update link state of " << aidSrc-1 << ", nexthop0 " << aidNext-1 << ", nexthop1 " << aidNext1-1 );
+ // NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " update link state of " << aidSrc-1 << ", nexthop0 " << aidNext-1 << ", nexthop1 " << aidNext1-1 );
  
-  NS_LOG_UNCOND ( " new Topology of  " << GetAddress () );
+  //NS_LOG_UNCOND ( " new Topology of  " << GetAddress () );
   uint16_t numhop = 0;
   for (uint16_t kk=0; kk < V; kk++) //only for bi
   {
@@ -1532,11 +2041,11 @@ PointToPointNetDevice::UpdateTopology (Mac48Address src, Mac48Address nexthop0, 
   
   if (m_channel->IsChannelUni () && numhop == 10)
   {
-              NS_LOG_UNCOND ( " complete Topology of  " << GetAddress () );
+              NS_LOG_DEBUG ( " complete Topology of  " << GetAddress () );
   }
   else if (!m_channel->IsChannelUni () && numhop == 20)
   {
-        NS_LOG_UNCOND ( " complete Topology of  " << GetAddress () );
+        NS_LOG_DEBUG ( " complete Topology of  " << GetAddress () );
   }
 }
 
@@ -1906,11 +2415,11 @@ PointToPointNetDevice::SendChannelRequestPacket (uint16_t counter)
      }
    counter++;
    
-   NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " send SendChannelRequestPacket at channel " << m_linkchannelTx << " counter " << counter
+   NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " send SendChannelRequestPacket at channel " << m_linkchannelTx << " counter " << counter
            << ", id " << m_reqid << ", PACKETREPEATNUMBER " << PACKETREPEATNUMBER);
       
    AddHeaderChannel (packet, 0x800);
-   NS_LOG_UNCOND ( " here " );
+   NS_LOG_DEBUG ( " here " );
    SendChannelSelection (packet, Mac48Address ("ff:ff:ff:ff:ff:fe"), 0x800); // GetBroadcast (), 0x800 are not really used
 
    m_SendChannelRequestPacketEvent = Simulator::Schedule (Channel_delay_packet, &PointToPointNetDevice::SendChannelRequestPacket, this, counter);
@@ -1958,7 +2467,7 @@ PointToPointNetDevice::SendChannelResponsePacket (uint16_t counter)
 void 
 PointToPointNetDevice::SendChannelRequest (void)
 {       
-   NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << "  SendChannelRequest "  << m_linkchannelRx << m_linkchannelTx);
+   NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << "  SendChannelRequest "  << m_linkchannelRx << m_linkchannelTx);
    
      if (m_watingChannelRespEvent.IsRunning()) // why it is still running?
         {
@@ -1980,8 +2489,8 @@ PointToPointNetDevice::SendChannelRequest (void)
         selectedTraced = true;
         CreateRoutingTable ();
        }
-        NS_LOG_UNCOND (GetAddress () << " channel selected at state EXTERNAL_SEND_CHANNEL_ACK  " << m_watingChannelRespTime << ", m_watingChannelConfTime " << m_watingChannelConfTime);
-        NS_LOG_UNCOND (GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
+        NS_LOG_DEBUG (GetAddress () << " channel selected at state EXTERNAL_SEND_CHANNEL_ACK  " << m_watingChannelRespTime << ", m_watingChannelConfTime " << m_watingChannelConfTime);
+        NS_LOG_DEBUG (GetAddress ()  <<  " m_nextHop0 " << m_nextHop0 << ", m_nextHop1 " << m_nextHop1 ); 
         if (m_watingChannelRespEvent.IsRunning()) // why it is still running?
         {
             m_watingChannelRespEvent.Cancel ();
@@ -2000,7 +2509,7 @@ PointToPointNetDevice::SendChannelRequest (void)
     }
     if (m_state == EXTERNAL_SEND_CHANNEL_REQ)
     {
-           NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << "...  SendChannelRequest "  << m_linkchannelRx << m_linkchannelTx);
+           NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << "...  SendChannelRequest "  << m_linkchannelRx << m_linkchannelTx);
            SetState (EXTERNAL_SEND_CHANNEL_REQ);
            if (m_WaitChannelEvent.IsRunning())
                m_WaitChannelEvent.Cancel();
@@ -2012,7 +2521,7 @@ PointToPointNetDevice::SendChannelRequest (void)
     }
     else
     {
-           NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << "  SendChannelRequest "  << m_linkchannelRx << m_linkchannelTx);
+           NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << "  SendChannelRequest "  << m_linkchannelRx << m_linkchannelTx);
 
            SetState (EXTERNAL_SEND_CHANNEL_REQ);
            if (m_WaitChannelEvent.IsRunning())
@@ -2027,7 +2536,7 @@ PointToPointNetDevice::SendChannelRequest (void)
    
     NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " start SendChannelRequestEvent " );
     m_reqid = m_packetId;
-    NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << "  SendChannelRequest id "  << m_reqid);
+    NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << "  SendChannelRequest id "  << m_reqid);
     SendChannelRequestPacket (0);
     uint16_t delay = m_rng->GetInteger (1, backoffcounter);
     Time ChannelResp_delay_total = MilliSeconds(delay) + ChannelResp_delay;
@@ -2080,7 +2589,7 @@ PointToPointNetDevice::SendChannelResponse (Mac48Address dest, uint16_t channel0
  }
            
       m_respid = packetid;
-    NS_LOG_UNCOND(Simulator::Now() << "\t" << GetAddress () << " start channel resp to " << m_destAddressResp );
+    NS_LOG_DEBUG(Simulator::Now() << "\t" << GetAddress () << " start channel resp to " << m_destAddressResp );
     SendChannelResponsePacket (0);
     uint16_t delay = m_rng->GetInteger (1, backoffcounter);
     Time ChannelConf_delay_total = ChannelConf_delay + MilliSeconds(delay);
@@ -2174,7 +2683,7 @@ PointToPointNetDevice::SendChannelSelection (
   NS_LOG_LOGIC ("p=" << packet << ", dest=" << &dest);
   NS_LOG_LOGIC ("UID is " << packet->GetUid ());
   
-  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send to " << dest);
+  NS_LOG_DEBUG (Simulator::Now() <<" \t " << GetAddress () << ", send to " << dest);
   
   if (m_type ==  DATATYPE )
   {
@@ -2203,7 +2712,7 @@ PointToPointNetDevice::SendChannelSelection (
   
     PppHeader ppp;
     packet->PeekHeader (ppp);
-      NS_LOG_UNCOND (Simulator::Now() <<" \t " << ppp.GetSourceAddre () << ", send to " << ppp.GetDestAddre () << ", hop0 " << ppp.GetNextHop0 () << ", hop1 " << ppp.GetNextHop1 ());
+      NS_LOG_DEBUG (Simulator::Now() <<" \t " << ppp.GetSourceAddre () << ", send to " << ppp.GetDestAddre () << ", hop0 " << ppp.GetNextHop0 () << ", hop1 " << ppp.GetNextHop1 ());
 
 
   //
@@ -2240,15 +2749,12 @@ PointToPointNetDevice::Send (
   NS_LOG_LOGIC ("p=" << packet << ", dest=" << &dest);
   NS_LOG_LOGIC ("UID is " << packet->GetUid ());
   
-  NS_LOG_UNCOND (Simulator::Now() <<" send data packet, " << GetAddress () << " to "  << dest);
-
   
   if ( m_state != EXTERNAL_REC_CHANNEL_ACK && m_state != INTERNAL_SEND_CHANNEL_ACK && m_state != EXTERNAL_SEND_CHANNEL_ACK )
   {
-      NS_LOG_DEBUG (Simulator::Now() <<" drop data packet, " << GetAddress () << ", since channel is not selected "  );
+      NS_LOG_UNCOND (Simulator::Now() <<" drop data packet, " << GetAddress () << ", since channel is not selected "  );
       return false;  
   }
-  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send data packet to " << dest << ", size " << packet->GetSize() << ", protocolNumber " << protocolNumber << "\t" << GetBroadcast ());
   m_destAddress = Mac48Address::ConvertFrom (dest);
   LlcSnapHeader llc_test;
   if (packet->PeekHeader (llc_test))
@@ -2261,26 +2767,24 @@ PointToPointNetDevice::Send (
         if (llc_test.GetType () == 2054)
         {
 
-          NS_LOG_DEBUG(" -> Found an ARP packet!");
+          NS_LOG_UNCOND(GetAddress ()  << "  Found an ARP packet!,  size " << packet->GetSize());
         }
   }
+  
+    NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send data packet to " << dest << ", size " << packet->GetSize() << ", protocolNumber " << protocolNumber );
+
  
   if  (dest == GetBroadcast () )
      {
         m_destAddress =  Mac48Address::ConvertFrom (GetBroadcast() );
-        NS_LOG_DEBUG (Simulator::Now() <<" \t " << GetAddress () << ", send data packet to " << m_destAddress << ", size " << packet->GetSize() << ", protocolNumber " << protocolNumber);
     }
   
-          NS_LOG_DEBUG (Simulator::Now() <<" drop data packet, " << GetAddress () << ", since channel is not selected "  );
-
           
   if (!m_channel->IsChannelUni ())
   {
-                  NS_LOG_DEBUG (Simulator::Now() <<" drop data packet, " << GetAddress () << ", since channel is not selected "  );
-
        uint16_t nextHop = LookupRoutingTable (Mac48Address::ConvertFrom(dest));
 
-       NS_LOG_DEBUG(Simulator::Now() << ", dst: " << dest << "\t my address:" << GetAddress()  <<  " --route to " << nextHop << ", packet " << packet->GetSize() <<
+       NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << "\t my address:" << GetAddress()  <<  " --route to " << nextHop << ", packet " << packet->GetSize() <<
                ", protocolNumber " << protocolNumber);
        m_destAddress = Mac48Address::ConvertFrom(dest);
        m_type =  DATATYPE;
@@ -2294,15 +2798,63 @@ PointToPointNetDevice::Send (
            
        if (nextHop == aid - 1 )
        {
-           NS_LOG_DEBUG(dest << "\t" << GetAddress()  <<  " route to  inside" );
+           NS_LOG_UNCOND(dest << "\t" << GetAddress()  <<  " route to  inside" );
            return m_DevSameNode->SendFromInside (packet, dest, protocolNumber, true);
        }
        else
        {
-           
+           // it will send to the other end of point to point channel
+
        }
   }
+  else
+  {
+      NS_LOG_UNCOND ("uni directional" );
 
+       uint16_t nextHop = LookupRoutingTable (Mac48Address::ConvertFrom(dest));
+
+       NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << "\t my address:" << GetAddress()  <<  " --route to " << nextHop << ", packet " << packet->GetSize() <<
+               ", protocolNumber " << protocolNumber);
+       m_destAddress = Mac48Address::ConvertFrom(dest);
+       m_type =  DATATYPE;
+       
+       uint8_t mac[6];
+       m_nextHop0.CopyTo (mac);
+       uint8_t aid_l = mac[5];
+       uint8_t aid_h = mac[4] & 0x1f;
+       uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+        
+          if (m_destAddress == Mac48Address ("ff:ff:ff:ff:ff:ff")  )  
+            {
+                Ptr<Packet> CopyPacket = packet->Copy ();
+                AddHeader (CopyPacket, protocolNumber);
+
+                //m_GESSameNode->Send (CopyPacket, dest, protocolNumber);
+                m_GESSameNode->Forward (CopyPacket);
+                goto unicast;
+            }
+          else if (aid !=  nextHop )
+            {
+                NS_LOG_UNCOND ("m_GESSameNode->Send (packet, dest, protocolNumber)");
+               //return m_GESSameNode->Send (packet, dest, protocolNumber);
+                Ptr<Packet> CopyPacket = packet->Copy ();
+                AddHeader (CopyPacket, protocolNumber);
+                //m_GESSameNode->Send (CopyPacket, dest, protocolNumber);
+                m_GESSameNode->Forward (CopyPacket);
+                goto unicast;
+            }
+         else
+            {
+                NS_LOG_UNCOND ("send through  p2p channel" );
+                Ptr<Packet> CopyPacket = packet->Copy ();
+                AddHeader (CopyPacket, protocolNumber);
+                m_GESSameNode->Send (CopyPacket, dest, protocolNumber);
+                m_GESSameNode->Forward (CopyPacket);
+                goto unicast;
+            }
+      
+  }
+unicast:
   m_type =  DATATYPE;
   
 
@@ -2325,6 +2877,7 @@ PointToPointNetDevice::Send (
   // shoving it out the door.
   //
   m_Qos = m_rng->GetInteger (0, 3);
+  m_Qos = 0;
   NS_LOG_UNCOND ("set data m_Qos " << uint16_t(m_Qos));
   AddHeader (packet, protocolNumber);
 
@@ -2438,6 +2991,13 @@ PointToPointNetDevice::SetPromiscReceiveCallback (NetDevice::PromiscReceiveCallb
   m_promiscCallback = cb;
 }
 
+void
+PointToPointNetDevice::SetSpiderReceiveCallback (NetDevice::ReceiveCallback cb)
+{
+    NS_LOG_FUNCTION (this);
+    m_spiderrxCallback = cb;
+}
+
 bool
 PointToPointNetDevice::SupportsSendFrom (void) const
 {
@@ -2523,6 +3083,7 @@ PointToPointNetDevice::AddDevice (Ptr<PointToPointNetDevice> dev)
 void
 PointToPointNetDevice::AddGESDevice (Ptr<PointToPointNetDeviceGES> deva)
 {
+  m_GESSameNodeFlag = true;
   m_GESSameNode = deva;
   NS_LOG_UNCOND (GetAddress () << " has GESDEVICE " << m_GESSameNode->GetAddress() );
 }

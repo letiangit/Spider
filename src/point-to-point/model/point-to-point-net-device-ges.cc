@@ -179,6 +179,8 @@ PointToPointNetDeviceGES::PointToPointNetDeviceGES ()
     m_txMachineState (READY),
     m_channel (0),
     m_linkUp (false),
+    m_DevSameNode0Flag (false),
+    m_packetId (0),
     m_currentPkt (0)
 {
   NS_LOG_FUNCTION (this);
@@ -192,11 +194,26 @@ PointToPointNetDeviceGES::~PointToPointNetDeviceGES ()
 void
 PointToPointNetDeviceGES::AddHeader (Ptr<Packet> p, uint16_t protocolNumber)
 {
+   NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", AddHeader , protocolNumber " << protocolNumber );
+
   NS_LOG_FUNCTION (this << p << protocolNumber);
   PppHeader ppp;
   ppp.SetProtocol (EtherToPpp (protocolNumber));
+  m_type =  DATATYPE; //temporary, should also includes linkstate 
+  ppp.SetType (m_type);
+  ppp.SetSourceAddre (Mac48Address::ConvertFrom (GetAddress ()));
+  ppp.SetDestAddre (m_destAddress);
+  m_Qos = 0; //temporary, should also includes linkstate 
+  ppp.SetQos (m_Qos);
+  ppp.SetTTL (0);
+  ppp.SetID (m_packetId);
+  m_packetId++;
+
   p->AddHeader (ppp);
+  
+
 }
+
 
 bool
 PointToPointNetDeviceGES::ProcessHeader (Ptr<Packet> p, uint16_t& param)
@@ -338,11 +355,37 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
   uint16_t protocol = 0;
   
   
-      PppHeader ppp;
+    PppHeader ppp;
     packet->PeekHeader (ppp);
-  
-  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet " );
+    
 
+      uint16_t ttl = ppp.GetTTL ();
+    
+      Ptr<Packet> CopyPacket = packet->Copy ();
+    
+    if (ppp.GetSourceAddre () == Mac48Address::ConvertFrom (GetAddress() ))
+      {
+          NS_ASSERT ("GES drop packet due to loop" );
+          return;
+      }
+      
+    if (m_DevSameNode0Flag && ppp.GetSourceAddre () == Mac48Address::ConvertFrom (m_DevSameNode0->GetAddress () ))
+      {
+          NS_ASSERT ("GES drop packet due to loop" );
+          return;
+      }
+  
+  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet from " << ppp.GetSourceAddre () << ", size " <<packet->GetSize () << ", id " << ppp.GetID () << ", ttl " << uint16_t(ppp.GetTTL ())  );
+    /*
+    if (ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
+      {
+
+        ProcessHeader (CopyPacket, protocol);
+        m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+        NS_LOG_UNCOND (GetAddress () << " GES send broadcast packet to upper layer");
+        //return;
+      } //arp request
+      */ //moved to below.
 
   if (m_receiveErrorModel && m_receiveErrorModel->IsCorrupt (packet) ) 
     {
@@ -354,6 +397,25 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
     }
   else 
     {
+     if ( m_DevSameNode0Flag)
+        {
+
+            if (ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
+                {
+                   ProcessHeader (CopyPacket, protocol);
+                   m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                   NS_LOG_UNCOND (GetAddress () << " GES upload broadcast packet to upper layer");
+                }
+            else if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress ()))
+                {
+                   ProcessHeader (CopyPacket, protocol);
+                   m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                }
+            m_DevSameNode0->ReceiveFromGES (packet);
+            NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet 2" );
+        }
+      else
+      {
       // 
       // Hit the trace hooks.  All of these hooks are in the same place in this 
       // device because it is so simple, but this is not usually the case in
@@ -377,6 +439,7 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
       //
       ProcessHeader (packet, protocol);
 
+
       if (!m_promiscCallback.IsNull ())
         {
           m_macPromiscRxTrace (originalPacket);
@@ -384,8 +447,85 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
         }
 
       m_macRxTrace (originalPacket);
+      NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet 2...." << protocol );
       m_rxCallback (this, packet, protocol, GetRemote ());
+      }
+    } 
+}
+
+
+void
+PointToPointNetDeviceGES::ReceiveFromLEO (Ptr<Packet> packet)
+{
+  NS_LOG_FUNCTION (this << packet);
+  uint16_t protocol = 0;
+  
+  
+    PppHeader ppp;
+    packet->PeekHeader (ppp);
+    
+      Ptr<Packet> CopyPacket = packet->Copy ();
+    
+    if (ppp.GetSourceAddre () == Mac48Address::ConvertFrom (GetAddress() ))
+      {
+          NS_ASSERT ("GES drop packet due to loop" );
+          return;
+      }
+      
+    if (m_DevSameNode0Flag && ppp.GetSourceAddre () == Mac48Address::ConvertFrom (m_DevSameNode0->GetAddress () ))
+      {
+          NS_ASSERT ("GES drop packet due to loop" );
+          return;
+      }
+  
+  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet from " << ppp.GetSourceAddre () << ", size " <<packet->GetSize () );
+  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet from " << ppp.GetSourceAddre () << ", size " <<packet->GetSize () << ", id " << ppp.GetID () << ", ttl " << uint16_t(ppp.GetTTL ())  );
+
+  
+    /*
+    if (ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
+      {
+
+        ProcessHeader (CopyPacket, protocol);
+        m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+        NS_LOG_UNCOND (GetAddress () << " GES send broadcast packet to upper layer");
+        //return;
+      } //arp request
+      */ //moved to below.
+
+  if (m_receiveErrorModel && m_receiveErrorModel->IsCorrupt (packet) ) 
+    {
+      // 
+      // If we have an error model and it indicates that it is time to lose a
+      // corrupted packet, don't forward this packet up, let it go.
+      //
+      m_phyRxDropTrace (packet);
     }
+  else 
+    {
+     if ( m_DevSameNode0Flag)
+        {
+
+            if (ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
+                {
+                   ProcessHeader (CopyPacket, protocol);
+                   m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                   NS_LOG_UNCOND (GetAddress () << " GES upload broadcast packet to upper layer");
+                }
+            else if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress ()))
+                {
+                   ProcessHeader (CopyPacket, protocol);
+                   m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                }
+            //m_DevSameNode0->ReceiveFromGES (packet);
+            Forward (packet);
+            NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet 2" );
+        }
+      else
+      {
+            NS_ASSERT (" incorrect device");
+      }
+    } 
 }
 
 Ptr<Queue>
@@ -431,8 +571,6 @@ PointToPointNetDeviceGES::GetChannel (void) const
 void
 PointToPointNetDeviceGES::SetAddress (Address address)
 {
-            NS_LOG_UNCOND ("PointToPointNetDeviceGES");
-
   NS_LOG_FUNCTION (this << address);
   m_address = Mac48Address::ConvertFrom (address);
 }
@@ -525,6 +663,7 @@ PointToPointNetDeviceGES::Send (
   NS_LOG_LOGIC ("p=" << packet << ", dest=" << &dest);
   NS_LOG_LOGIC ("UID is " << packet->GetUid ());
 
+
   //
   // If IsLinkUp() is false it means there is no channel to send any packet 
   // over so we just hit the drop trace on the packet and return an error.
@@ -535,16 +674,27 @@ PointToPointNetDeviceGES::Send (
       return false;
     }
   
-   NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send GES data packet to " << dest << ", size " << packet->GetSize() << ", protocolNumber " << protocolNumber << "\t" << GetBroadcast ());
-
+  
+  
+   m_destAddress = Mac48Address::ConvertFrom (dest);
 
   //
   // Stick a point to point protocol header on the packet in preparation for
   // shoving it out the door.
   //
   AddHeader (packet, protocolNumber);
+  
+  NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send GES data packet to " << dest << ", size " << packet->GetSize() << ", protocolNumber " << protocolNumber << ", id " << m_packetId - 1);
+
 
   m_macTxTrace (packet);
+  
+  if (m_DevSameNode0Flag ) //packet generated by application, sent to both LEO and GES
+    {
+      Ptr<Packet> CopyPacket = packet->Copy ();
+      m_DevSameNode0->ReceiveFromGES (CopyPacket);
+
+    }
 
   //
   // We should enqueue and dequeue the packet to hit the tracing hooks.
@@ -556,13 +706,19 @@ PointToPointNetDeviceGES::Send (
       // 
       if (m_txMachineState == READY)
         {
+          NS_LOG_UNCOND (GetAddress () << ", m_txMachineState == READY -------------------------------------------- " );
+
           packet = m_queue->Dequeue ();
           m_snifferTrace (packet);
           m_promiscSnifferTrace (packet);
           return TransmitStart (packet);
         }
+
       return true;
     }
+  
+  NS_LOG_UNCOND (GetAddress () << ", fail to queue -------------------------------------------- " );
+
 
   // Enqueue may fail (overflow)
   m_macTxDropTrace (packet);
@@ -596,7 +752,7 @@ bool
 PointToPointNetDeviceGES::NeedsArp (void) const
 {
   NS_LOG_FUNCTION (this);
-  return false;
+  return true;
 }
 
 void
@@ -666,6 +822,7 @@ PointToPointNetDeviceGES::PppToEther (uint16_t proto)
     {
     case 0x0021: return 0x0800;   //IPv4
     case 0x0057: return 0x86DD;   //IPv6
+    case 0x0806: return 0x0806;   //Arp   //invented number for arp
     default: NS_ASSERT_MSG (false, "PPP Protocol number not defined!");
     }
   return 0;
@@ -679,6 +836,7 @@ PointToPointNetDeviceGES::EtherToPpp (uint16_t proto)
     {
     case 0x0800: return 0x0021;   //IPv4
     case 0x86DD: return 0x0057;   //IPv6
+    case 0x0806: return 0x0806;   //invented number for arp
     default: NS_ASSERT_MSG (false, "PPP Protocol number not defined!");
     }
   return 0;
@@ -688,6 +846,7 @@ void
 PointToPointNetDeviceGES::AddDevice0 (Ptr<PointToPointNetDevice> dev)
 {
   m_DevSameNode0 = dev;
+  m_DevSameNode0Flag = true;
   NS_LOG_UNCOND (GetAddress () << " has LEODEVICE 0 " << m_DevSameNode0->GetAddress() );
 }
 
@@ -696,6 +855,22 @@ PointToPointNetDeviceGES::AddDevice1 (Ptr<PointToPointNetDevice> dev)
 {
   m_DevSameNode1 = dev;
   NS_LOG_UNCOND (GetAddress () << " has LEODEVICE 1 " << m_DevSameNode1->GetAddress() );
+}
+
+
+void 
+PointToPointNetDeviceGES::Forward (Ptr<Packet> packet)
+{
+   if (IsLinkUp () == false)
+    {
+      NS_ASSERT ("there is no channel");  
+      return;
+    } 
+   
+  if (m_txMachineState == READY)
+     {
+       TransmitStart (packet);
+     }   
 }
 
 

@@ -11,6 +11,8 @@ def build(bld):
         'model/point-to-point-remote-channel.cc',
         'model/ppp-header.cc',
         'model/spf.cc',
+        'model/spider-client.cc',
+        'model/spider-server.cc',
         'helper/point-to-point-helper.cc',
         ]
 
@@ -29,6 +31,8 @@ def build(bld):
         'model/point-to-point-remote-channel.h',
         'model/ppp-header.h',
         'model/spf.h',
+        'model/spider-client.h',
+        'model/spider-server.h',
         'helper/point-to-point-helper.h',
         ]
 

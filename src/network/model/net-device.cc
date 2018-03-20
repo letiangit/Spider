@@ -42,5 +42,12 @@ NetDevice::~NetDevice ()
 {
   NS_LOG_FUNCTION (this);
 }
+    
+void
+NetDevice::SetSpiderReceiveCallback (ReceiveCallback cb)
+{
+    NS_LOG_FUNCTION (this);
+}
+
 
 } // namespace ns3

@@ -151,6 +151,7 @@ public:
    * \param p Ptr to the received packet.
    */
   void Receive (Ptr<Packet> p);
+  void ReceiveFromLEO (Ptr<Packet> packet);
 
   // The remaining methods are documented in ns3::NetDevice*
 
@@ -199,6 +200,10 @@ public:
   virtual bool SupportsSendFrom (void) const;
   void AddDevice0 (Ptr<PointToPointNetDevice> dev);
   void AddDevice1 (Ptr<PointToPointNetDevice> dev);
+  void Forward (Ptr<Packet> packet);
+  bool m_DevSameNode0Flag;
+  
+  NetDevice::ReceiveCallback m_rxCallback;   //!< Receive callback
   
   //PointToPointNetDeviceGES& operator = (const PointToPointNetDeviceGES &o);
 
@@ -235,6 +240,7 @@ private:
    * \brief Dispose of the object
    */
   virtual void DoDispose (void);
+  
 
 private:
 
@@ -450,7 +456,6 @@ private:
 
   Ptr<Node> m_node;         //!< Node owning this NetDevice
   Mac48Address m_address;   //!< Mac48Address of this NetDevice
-  NetDevice::ReceiveCallback m_rxCallback;   //!< Receive callback
   NetDevice::PromiscReceiveCallback m_promiscCallback;  //!< Receive callback
                                                         //   (promisc data)
   uint32_t m_ifIndex; //!< Index of the interface
@@ -487,6 +492,11 @@ private:
   
   Ptr<PointToPointNetDevice> m_DevSameNode0;
   Ptr<PointToPointNetDevice> m_DevSameNode1;
+  
+  uint16_t m_type;
+  uint8_t m_Qos;
+  uint32_t m_packetId;
+  Mac48Address m_destAddress;
 
 };
 

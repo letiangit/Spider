@@ -113,9 +113,9 @@ PppHeader::Serialize (Buffer::Iterator start) const
    uint32_t temp_id;
    temp_id = (m_ttl << 24 ) |  m_id; 
    
-  NS_LOG_UNCOND ("m_type  " << m_type << ", m_Qos " << m_Qos << ", m_ttl " << uint16_t(m_ttl));
+  //NS_LOG_UNCOND ("m_type  " << m_type << ", m_Qos " << m_Qos << ", m_ttl " << uint16_t(m_ttl));
 
-  NS_LOG_UNCOND ("Serialize temp_id  " << temp_id << ", id " << m_id);
+  //NS_LOG_UNCOND ("Serialize temp_id  " << temp_id << ", id " << m_id);
   start.WriteHtolsbU16 (m_protocol);
   start.WriteU8 (temp);
   start.WriteHtolsbU32 (temp_id);
@@ -156,6 +156,7 @@ PppHeader::Deserialize (Buffer::Iterator start)
   temp_id = i.ReadLsbtohU32 ();
 
   m_id = temp_id & 0xffffff;
+  m_ttl = (temp_id >> 24) & 0xff;
   ReadFrom (i, m_addressSrc);
   ReadFrom (i, m_addressDest);
   if (m_type == CHANNELREQ)
@@ -169,7 +170,9 @@ PppHeader::Deserialize (Buffer::Iterator start)
       ReadFrom (i, m_nextHop0);
       ReadFrom (i, m_nextHop1);
    }
+  //NS_LOG_UNCOND ("read m_type  " << m_type << ", m_Qos " << m_Qos << ", m_ttl " << uint16_t(m_ttl));
   return i.GetDistanceFrom (start);
+
   //NS_LOG_UNCOND ("m_protocol " << m_protocol << "\t" << m_addressSrc << "\t" << m_addressDest );
 }
 

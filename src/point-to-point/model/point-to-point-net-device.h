@@ -98,7 +98,8 @@ public:
     #define CHANNELNUMBER 4
     //#define PACKETREPEATNUMBER 4
     
-    #define V 22
+    //#define V 22
+    #define V 24 //two GES station
 
   /**
    * \brief Get the TypeId
@@ -251,6 +252,10 @@ public:
   //virtual void SendDataPacket (void);
   virtual Ptr<Packet> PreparePacketToSend (void);
   virtual void setNextHop1 (Mac48Address addr);
+  
+  void UpdateTopologyGES ();
+  
+
 
 
 
@@ -261,6 +266,12 @@ public:
   virtual void SendChannelResponsePacket (uint16_t counter);
   virtual void AddDevice (Ptr<PointToPointNetDevice> dev);
   void AddGESDevice (Ptr<PointToPointNetDeviceGES> dev);
+  
+  void ReceiveFromGES (Ptr<Packet> packet);
+    
+
+
+
 
 
 
@@ -271,10 +282,13 @@ public:
   virtual bool NeedsArp (void) const;
 
   virtual void SetReceiveCallback (NetDevice::ReceiveCallback cb);
+  void SetSpiderReceiveCallback (NetDevice::ReceiveCallback cb);
+
 
   virtual Address GetMulticast (Ipv6Address addr) const;
 
   virtual void SetPromiscReceiveCallback (PromiscReceiveCallback cb);
+
   virtual bool SupportsSendFrom (void) const;
   virtual void  Cancel4Events ();
 
@@ -561,6 +575,8 @@ private:
   NetDevice::ReceiveCallback m_rxCallback;   //!< Receive callback
   NetDevice::PromiscReceiveCallback m_promiscCallback;  //!< Receive callback
                                                         //   (promisc data)
+  NetDevice::ReceiveCallback m_spiderrxCallback;
+
   uint32_t m_ifIndex; //!< Index of the interface
   bool m_linkUp;      //!< Identify if the link is up or not
   TracedCallback<> m_linkChangeCallbacks;  //!< Callback for the link change event
@@ -654,6 +670,7 @@ private:
     ShortPath  CalPath;
     uint32_t * tablePoint;
     uint8_t m_Qos;
+    bool m_GESSameNodeFlag;
 
 };
 

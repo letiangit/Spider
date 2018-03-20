@@ -97,6 +97,8 @@ main (int argc, char *argv[])
     //LogComponentEnable ("Ipv4Interface", LOG_LOGIC);
     //LogComponentEnable ("ArpL3Protocol", LOG_LOGIC);
     //LogComponentEnable ("Ipv4L3Protocol", LOG_LOGIC);
+    LogComponentEnable ("SpiderClient", LOG_INFO);
+
     
 
     
@@ -108,7 +110,7 @@ main (int argc, char *argv[])
   uint32_t CycelIntervalCh = 20;
   uint32_t backoffcounter = 1000;
   uint32_t NexternalSel = 1;
-  bool UniChannel = false;
+  bool UniChannel = true;
   bool NominalMode = true;
   string Outputpath;
     
@@ -198,6 +200,8 @@ main (int argc, char *argv[])
         NS_LOG_UNCOND ("install Ges, node  " << kk);
         devicesSetGES = pointToPoint.InstallGES (nodesGES.Get(0), nodes.Get(kk));
     }
+    
+
 
   for (uint32_t kk = 0; kk < NexternalSel; kk++)
     {
@@ -208,21 +212,30 @@ main (int argc, char *argv[])
       Config::Set ("/NodeList/"+strSTA+"/DeviceList/0/$ns3::PointToPointNetDevice/StartChannelSelection", BooleanValue(true)); //node  receive external command for channel selection
     }
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDevice/ChannelSelected", MakeCallback (&ChannelSelection));
-
-
-  InternetStackHelper stack;
-  stack.Install (nodes);
-  stack.Install (nodesGES);
-
-  Ipv4AddressHelper address;
-  address.SetBase ("10.1.0.0", "255.255.255.0");
-  Ipv4InterfaceContainer interfaces = address.Assign (devicesSet);
     
-  //for GES
-  address.SetBase ("10.2.0.0", "255.255.255.0");
-  Ipv4InterfaceContainer interfacesGES = address.Assign (devicesSetGES);
+    
+
+    SpiderClient clientApp;
+
+    clientApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(10)->GetDevice(0)->GetAddress()) );
+    clientApp.SetMaxPackets (1000);
+    clientApp.SetInterval (Seconds(100));
+    clientApp.SetPacketSize (2000);
+    clientApp.InstallDevice (nodes.Get(0)->GetDevice(0));
+    
+    SpiderServer ServerApp;
+    ServerApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(0)->GetDevice(0)->GetAddress()) );
+    ServerApp.InstallDevice (nodes.Get(10)->GetDevice(0));
+
+
+
+
+    NS_LOG_UNCOND ("Start channel selection ----------- Nnodes " );
+
+
   
   std::ofstream myfile;
+    
   std::string dropfile=m_Outputpath;
   myfile.open (dropfile, ios::out | ios::trunc);
   myfile << "Start channel selection ----------- Nnodes " << Nnodes << ", Ndevice " << devicesSet.GetN () << ", UniChannel " << UniChannel << "\n";
@@ -231,7 +244,7 @@ main (int argc, char *argv[])
     
   for (uint32_t kk = 0; kk < Nnodes; kk++)
     {
-        NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodes.Get(kk)->GetId () << ", device " << nodes.Get(kk)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(1)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(2)->GetAddress() );
+        NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodes.Get(kk)->GetId () << ", device " << nodes.Get(kk)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(1)->GetAddress()  );
     }
     
   for (uint32_t kk = 0; kk < Nnodes; kk++)
@@ -239,66 +252,24 @@ main (int argc, char *argv[])
         NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodesGES.Get(0)->GetId () << ", device " << nodesGES.Get(0)->GetDevice(kk)->GetAddress()  );
     }
 
-  /*
-  UdpEchoServerHelper echoServer (9);
- 
-  ApplicationContainer serverApps = echoServer.Install (nodes.Get (0));
-  serverApps.Start (Seconds (1.0));
-  serverApps.Stop (Seconds (1000.0));
 
-  UdpEchoClientHelper echoClient (interfaces.GetAddress (0), 9);
-
-  echoClient.SetAttribute ("MaxPackets", UintegerValue (1000));
-  echoClient.SetAttribute ("Interval", TimeValue (Seconds (100.0)));
-  echoClient.SetAttribute ("PacketSize", UintegerValue (500));
-  NS_LOG_UNCOND ("install devicesSet finish ....."  );
-
-
-  ApplicationContainer clientApps = echoClient.Install (nodes.Get (Nnodes-4));
-  clientApps.Start (Seconds (2.0));
-  clientApps.Stop (Seconds (1000.0)); */
-    
-  //GES
-  
-  UdpEchoServerHelper echoServerGES (8);
-    
-  ApplicationContainer serverAppsGES = echoServerGES.Install (nodes.Get (0)); //server
-  serverAppsGES.Start (Seconds (1.0));
-  serverAppsGES.Stop (Seconds (1000.0));
-    
-  UdpEchoClientHelper echoClientGES (interfacesGES.GetAddress (1), 8); //device of server
-    
-   //UdpEchoClientHelper echoClientGES (interfaces.GetAddress (9), 8); //device of server
-
-    
-  echoClientGES.SetAttribute ("MaxPackets", UintegerValue (1000));
-  echoClientGES.SetAttribute ("Interval", TimeValue (Seconds (100.0)));
-  echoClientGES.SetAttribute ("PacketSize", UintegerValue (1500));
-    
-    
-  ApplicationContainer clientAppsGES = echoClientGES.Install (nodesGES.Get (0)); //client
-  clientAppsGES.Start (Seconds (2.0));
-  clientAppsGES.Stop (Seconds (1000.0));
-    
-  Simulator::Stop (Seconds (1000.0));
-    //
     
     for (uint32_t kk = 0; kk < 2*Nnodes; kk++)
     {
         
         NS_LOG_UNCOND( "devicesSetGES " << devicesSetGES.GetN () );
-
-        //NS_LOG_UNCOND( "interfacesGES.GetAddress " << interfaces.GetAddress (kk)  );
-
-        NS_LOG_UNCOND( "interfacesGES.GetAddress " << interfacesGES.GetAddress (kk)  );
     }
     
   NS_LOG_UNCOND ("install devicesSet finish ....."  );
-
-  //PopulateArpCache ();
-
-  //Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
     
+    clientApp.StartApplication (Seconds (100.0));
+    clientApp.StopApplication (Seconds (1000.0));
+    
+    ServerApp.StartApplication (Seconds (100.0));
+    ServerApp.StopApplication (Seconds (1000.0));
+    
+    Simulator::Stop (Seconds (1000.0));
+
 
 
   Simulator::Run ();

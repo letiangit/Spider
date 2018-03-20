@@ -446,7 +446,7 @@ NetDeviceContainer
 PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
 {
   //NetDeviceContainer container;
-  std::cout << ".................InstallUni : a  " << a->GetId () << ", b " <<  b->GetId () << '\n';
+  NS_LOG_UNCOND (".................InstallUni : a  " << a->GetId () << ", b " <<  b->GetId () );
 
     
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
@@ -456,17 +456,17 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      //devATemp = m_nodeDeviceMap.find (a->GetId ())->second;
      devA  = m_nodeDeviceMap.find (a->GetId ())->second;
      //std::cout << "...node a already in the list : " << devATemp->GetAddress ()<< '\n';
-     std::cout << "...node a already in the list : " << devA->GetAddress ()<< '\n';
+     NS_LOG_UNCOND( "...node a already in the list : " << devA->GetAddress () );
     }
   else
     {
-     std::cout << "...node a not in the list : \n";
+     NS_LOG_UNCOND( "...node a not in the list : \n");
      
      devA = m_deviceFactory.Create<PointToPointNetDevice> ();
      devA->SetAddress (Mac48Address::Allocate ());
      a->AddDevice (devA);
      m_nodeDeviceMap[a->GetId ()] = devA;
-     std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
+     NS_LOG_UNCOND("node " << a->GetId () << " install device, number " << a->GetNDevices () );
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
@@ -484,13 +484,16 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
     }
   else
     {
-     std::cout << "....node b not in the list : \n";
+     NS_LOG_UNCOND( "....node b not in the list : \n");
      
      devB = m_deviceFactory.Create<PointToPointNetDevice> ();
      devB->SetAddress (Mac48Address::Allocate ());
+               NS_LOG_UNCOND( "AddDevice before " );
      b->AddDevice (devB);
+          NS_LOG_UNCOND( "AddDevice after " );
+
      m_nodeDeviceMap[b->GetId ()] = devB;
-     std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
+     NS_LOG_UNCOND( "node " << b->GetId () << " install device, number " << b->GetNDevices () );
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
@@ -498,6 +501,8 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
      devB->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
     }
+          NS_LOG_UNCOND ("Attach start 0");
+
 
   //Ptr<PointToPointNetDevice> devA = m_deviceFactory.Create<PointToPointNetDevice> ();
   /*devA =  m_deviceFactory.Create<PointToPointNetDevice> ();
@@ -544,9 +549,12 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
       devA->AggregateObject (mpiRecA);
       devB->AggregateObject (mpiRecB);
     } */
+        NS_LOG_UNCOND ("Attach start");
 
   devA->Attach (channel, 0); //0 transmitter
   devB->Attach (channel, 1); //1 receiver 
+        NS_LOG_UNCOND ("Attach over");
+
   
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
   if (m_nodeListIterator != m_nodeList.end())
