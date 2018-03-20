@@ -100,6 +100,8 @@ public:
     
     //#define V 22
     #define V 24 //two GES station
+    #define TTLmax 24 //two GES station
+
 
   /**
    * \brief Get the TypeId
@@ -663,8 +665,13 @@ private:
    typedef void (* ChannelSelectedCallback)
     (const Mac48Address addr, const Time ts, const uint32_t rx,
      const uint32_t tx);
+   
+   typedef void (* RecPacketCallback)
+    (const Mac48Address addr, const Mac48Address from, const Mac48Address to, const Time ts, const uint32_t rx,
+     const uint32_t tx);
      
     TracedCallback<Mac48Address, Time, uint32_t, uint32_t > m_channelSelected;
+    TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t > m_recPacketTrace;
     
     uint32_t Topology[V][V];
     ShortPath  CalPath;

@@ -81,7 +81,7 @@ PointToPointChannelGES::Attach (Ptr<PointToPointNetDeviceGES> device)
       m_link[0].m_state = IDLE;
       m_link[1].m_state = IDLE;
     }
-}
+} 
 
 bool
 PointToPointChannelGES::TransmitStart (

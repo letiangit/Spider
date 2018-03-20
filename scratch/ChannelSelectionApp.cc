@@ -46,6 +46,27 @@ ChannelSelection  (std::string contex, Mac48Address addr, Time ts, uint32_t rx, 
 }
 
 void
+RecPacket  (std::string contex, Mac48Address addr, Mac48Address from, Mac48Address to, Time ts, uint32_t size, uint32_t protocol)
+{
+    std::ofstream myfile;
+    std::string dropfile=m_Outputpath;
+    myfile.open (dropfile, ios::out | ios::app);
+    myfile << ts << "\t"  << addr << " receives packet from "  << from  << " to " << to  << ", size "  <<  size << ",  protocol " << protocol << "\n";
+    myfile.close();
+}
+
+void
+RecPacketGES  (std::string contex, Mac48Address addr, Mac48Address from, Mac48Address to, Time ts, uint32_t size, uint32_t protocol)
+{
+    std::ofstream myfile;
+    std::string dropfile=m_Outputpath;
+    myfile.open (dropfile, ios::out | ios::app);
+    myfile << ts << "\t GES "  << addr << " receives packet from "  << from  << " to " << to  << ", size "  <<  size << ",  protocol " << protocol << "\n";
+    myfile.close();
+}
+
+
+void
 PopulateArpCache ()
 {
     Ptr<ArpCache> arp = CreateObject<ArpCache> ();
@@ -193,12 +214,16 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("install devicesSet finish " << nodes.Get(Nnodes-1)->GetId () << "\t" << nodes.Get(0)->GetId ()  << ", size " << devicesSet.GetN () );
   //install GES and LEO
   NodeContainer nodesGES;
-  nodesGES.Create (1);
+  uint32_t NGESnodes = 1;
+  nodesGES.Create (NGESnodes);
   NetDeviceContainer devicesSetGES;
-  for (uint32_t kk = 0; kk < Nnodes; kk++)
+    
+    for (uint32_t ii = 0; ii < NGESnodes; ii++)
     {
-        NS_LOG_UNCOND ("install Ges, node  " << kk);
-        devicesSetGES = pointToPoint.InstallGES (nodesGES.Get(0), nodes.Get(kk));
+        for (uint32_t kk = 0; kk < Nnodes; kk++)
+        {
+            devicesSetGES = pointToPoint.InstallGES (nodesGES.Get(ii), nodes.Get(kk));
+        }
     }
     
 
@@ -212,20 +237,22 @@ main (int argc, char *argv[])
       Config::Set ("/NodeList/"+strSTA+"/DeviceList/0/$ns3::PointToPointNetDevice/StartChannelSelection", BooleanValue(true)); //node  receive external command for channel selection
     }
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDevice/ChannelSelected", MakeCallback (&ChannelSelection));
+  Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDevice/RecPacketTrace", MakeCallback (&RecPacket));
+  Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDeviceGES/RecPacketTrace", MakeCallback (&RecPacketGES));
     
     
 
     SpiderClient clientApp;
 
-    clientApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(10)->GetDevice(0)->GetAddress()) );
+    clientApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(10)->GetDevice(1)->GetAddress()) );
     clientApp.SetMaxPackets (1000);
     clientApp.SetInterval (Seconds(100));
     clientApp.SetPacketSize (2000);
-    clientApp.InstallDevice (nodes.Get(0)->GetDevice(0));
+    clientApp.InstallDevice (nodes.Get(0)->GetDevice(1));
     
     SpiderServer ServerApp;
-    ServerApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(0)->GetDevice(0)->GetAddress()) );
-    ServerApp.InstallDevice (nodes.Get(10)->GetDevice(0));
+    ServerApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(0)->GetDevice(1)->GetAddress()) );
+    ServerApp.InstallDevice (nodes.Get(10)->GetDevice(1));
 
 
 
@@ -244,19 +271,21 @@ main (int argc, char *argv[])
     
   for (uint32_t kk = 0; kk < Nnodes; kk++)
     {
-        NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodes.Get(kk)->GetId () << ", device " << nodes.Get(kk)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(1)->GetAddress()  );
+        //NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodes.Get(kk)->GetId () << ", device " << nodes.Get(kk)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(1)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(2)->GetAddress()  );
     }
     
-  for (uint32_t kk = 0; kk < Nnodes; kk++)
+  for (uint32_t ii = 0; ii < NGESnodes; ii++)
     {
-        NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodesGES.Get(0)->GetId () << ", device " << nodesGES.Get(0)->GetDevice(kk)->GetAddress()  );
+        for (uint32_t kk = 0; kk < Nnodes; kk++)
+        {
+            NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodesGES.Get(ii)->GetId () << ", device " << nodesGES.Get(ii)->GetDevice(kk)->GetAddress()  );
+        }
     }
 
 
     
     for (uint32_t kk = 0; kk < 2*Nnodes; kk++)
     {
-        
         NS_LOG_UNCOND( "devicesSetGES " << devicesSetGES.GetN () );
     }
     

@@ -221,6 +221,11 @@ PointToPointNetDevice::GetTypeId (void)
                     "The header of successfully transmitted packet",
                     MakeTraceSourceAccessor (&PointToPointNetDevice::m_channelSelected),
                     "ns3::PointToPointNetDevice::ChannelSelectedCallback")
+    .AddTraceSource ("RecPacketTrace",
+                    "Channel has been successfully Selected"
+                    "The header of successfully transmitted packet",
+                    MakeTraceSourceAccessor (&PointToPointNetDevice::m_recPacketTrace),
+                    "ns3::PointToPointNetDevice::RecPacketCallback")
   ;
   return tid;
 }
@@ -1269,7 +1274,6 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
 void
 PointToPointNetDevice::Receive (Ptr<Packet> packet)
 {
-  NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() );
   NS_LOG_FUNCTION (this << packet);
   uint16_t protocol = 0;
   
@@ -1298,6 +1302,12 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       // headers.
       //
    
+                    
+              if (m_GESSameNodeFlag  )
+               {
+                   NS_LOG_UNCOND (GetAddress ( ) << " has GES " << m_GESSameNode->GetAddress());
+
+               }
 
 
       //
@@ -1309,7 +1319,7 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       PppHeader ppp;
       packet->PeekHeader (ppp);
       uint8_t ttl = ppp.GetTTL ();
-      if (ttl > 12)
+      if (ttl > TTLmax)
       {
           NS_LOG_UNCOND ("PACKET DROPPED DUE TO TTL ");
           return;
@@ -1331,12 +1341,10 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
        
   
       ProcessHeader (packet, protocol);
-            Ptr<Packet> packet2 = packet->Copy ();
+      Ptr<Packet> packet2 = packet->Copy ();
 
-      
-      NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
-         
-       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+               
+       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol << ",  id " << ppp.GetID() );
 
      if (ppp.GetSourceAddre () == Mac48Address::ConvertFrom (GetAddress() ))
       {
@@ -1354,7 +1362,9 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       m_macRxTrace (originalPacket);
       if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ) || ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
       {
-      m_rxCallback (this, packet, protocol, GetRemote ());
+       //NS_LOG_UNCOND(Simulator::Now() << "\t"  << GetAddress () << " receives packet from "  <<ppp.GetSourceAddre() << " to " << ppp.GetDestAddre ()  << ", size "  <<  packet->GetSize() << ",  protocol " << protocol );
+       m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+       m_rxCallback (this, packet, protocol, GetRemote ());
        Ptr<Packet> SpiderPacket = packet->Copy ();
        //m_spiderrxCallback (this, SpiderPacket, protocol, GetRemote ());
 
@@ -1367,7 +1377,7 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
       }
       //NS_LOG_DEBUG ( GetAddress () << "\t" << m_address );
 
-            NS_LOG_UNCOND(Simulator::Now() << "\t" << ", 2 myaddress..." << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", 2 myaddress..." << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
 
       if (m_channel->IsChannelUni () )
       {
@@ -1539,7 +1549,7 @@ PointToPointNetDevice::ReceiveFromGES (Ptr<Packet> packet)
       packet->PeekHeader (ppp);
       
       uint8_t ttl = ppp.GetTTL ();
-      if (ttl > 12)
+      if (ttl > TTLmax)
         {
           NS_LOG_UNCOND ("PACKET DROPPED DUE TO TT--GESL ");
           return;
@@ -1558,7 +1568,7 @@ PointToPointNetDevice::ReceiveFromGES (Ptr<Packet> packet)
       ProcessHeader (packet, protocol);
       
          
-       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", ReceiveFromGES myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol << ", id " << ppp.GetID () );
 
      if (ppp.GetSourceAddre () == Mac48Address::ConvertFrom (GetAddress() ))
       {

@@ -630,6 +630,7 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
   if (Ndevice > 0) //add leo device to ges
     {
         // node b is LEO station, only has GES device and LEO device
+        //for bi, only one leo device connect to ges
         Ptr<PointToPointNetDevice> dev0  = m_nodeDeviceMap.find (b->GetId ())->second;
         devB->AddDevice0 (dev0);
         dev0->AddGESDevice (devB);
