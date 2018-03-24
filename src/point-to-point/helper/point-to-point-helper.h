@@ -33,6 +33,9 @@
 
 #include "ns3/trace-helper.h"
 
+#include "ns3/point-to-point-channel-ges.h"
+
+
 namespace ns3 {
 
 class Queue;
@@ -161,6 +164,10 @@ public:
    * Saves you from having to construct a temporary NodeContainer.
    */
   NetDeviceContainer Install (std::string aNode, std::string bNode);
+  
+  void InitTopologyGES (Ptr<Node> a, Ptr<Node> b);
+  void InitTopologyGES (uint32_t LEONUM, uint32_t GESNUM, uint32_t GESPos[], Time PosShiftInterval);
+
 
 private:
   /**
@@ -200,10 +207,24 @@ private:
   ObjectFactory m_deviceFactory;        //!< Device Factory
   ObjectFactory m_deviceGESFactory;        //!< Device Factory
   
+  Ptr<PointToPointChannelGES> m_channelGES;
+  
   
   std::list< Ptr<Node> > m_nodeList;
   std::list< Ptr<Node> >::iterator m_nodeListIterator;
   std::map<uint32_t, Ptr<PointToPointNetDevice> > m_nodeDeviceMap;
+  
+  std::map<uint32_t, Ptr<PointToPointNetDeviceGES> >::iterator m_nodeGESIterator;
+  std::map<uint32_t, Ptr<PointToPointNetDeviceGES> > m_nodeGESDeviceMap;
+  
+  std::map<uint32_t, Mac48Address>::iterator m_deviceMapPositionIterator;
+  std::map<uint32_t, Mac48Address> m_LEOdeviceMapPosition;
+  std::map<uint32_t, Mac48Address> m_GESdeviceMapPosition;
+  
+     
+   
+
+
 
   //Ptr<NetDevice> devA;
   //Ptr<NetDevice> devB;
@@ -219,6 +240,13 @@ private:
   
   NetDeviceContainer container;
   NetDeviceContainer m_containerGES;
+  
+  bool useGESChannel;
+  
+  uint32_t m_LEONum;
+  uint32_t m_GESNum;
+  
+  uint32_t m_initPosLES [9999];
 
 };
 

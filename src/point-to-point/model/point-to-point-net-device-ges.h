@@ -32,6 +32,9 @@
 #include "ns3/mac48-address.h"
 #include "point-to-point-net-device.h"
 
+
+#include <map>
+
 namespace ns3 {
 
 class Queue;
@@ -206,6 +209,17 @@ public:
   NetDevice::ReceiveCallback m_rxCallback;   //!< Receive callback
   
   //PointToPointNetDeviceGES& operator = (const PointToPointNetDeviceGES &o);
+  
+  
+  void InitLinkDst (uint32_t position, uint32_t InitPosLES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumLEO, Time interval);
+  void updateLinkDst (void);
+  
+  //attach to LEO
+  void LEOInitLinkDst (uint32_t position, uint32_t InitPosLES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumGES,uint32_t NumLEO, Time interval);
+  void LEOupdateLinkDst (void);
+  
+
+
 
 protected:
   /**
@@ -283,7 +297,7 @@ private:
    * \param p a reference to the packet to send
    * \returns true if success, false on failure
    */
-  bool TransmitStart (Ptr<Packet> p);
+  bool TransmitStart (Ptr<Packet> p, Mac48Address );
 
   /**
    * Stop Sending a Packet Down the Wire and Begin the Interframe Gap.
@@ -504,6 +518,34 @@ private:
   uint8_t m_Qos;
   uint32_t m_packetId;
   Mac48Address m_destAddress;
+  
+  
+  uint32_t m_indicator;
+  uint32_t m_initPosLES[9999];
+  uint32_t m_linkDst[9999];
+  std::map<uint32_t, Mac48Address>  m_deviceMapPosition;
+  uint32_t m_NumLEO;
+  Time m_dstLEOinterval;
+  Mac48Address m_dstLEOAddr;
+  
+  //attach to LEO
+  //uint32_t m_indicator;
+  uint32_t m_initPostion;
+  uint32_t m_initPosGES[9999];
+  //uint32_t m_linkDst[9999];
+  //std::map<uint32_t, Mac48Address>  m_deviceMapPosition;
+  uint32_t m_NumGES;
+  Time m_dstGESinterval;
+  Mac48Address m_dstGESAddr;
+  
+  
+  
+   EventId LEOupdateLinkDstEvent;
+   EventId GESupdateLinkDstEvent;
+
+
+
+
 
 };
 

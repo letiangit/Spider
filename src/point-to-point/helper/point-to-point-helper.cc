@@ -50,6 +50,10 @@ namespace ns3 {
 NS_LOG_COMPONENT_DEFINE ("PointToPointHelper");
 
 PointToPointHelper::PointToPointHelper ()
+:
+    useGESChannel (true),
+    m_LEONum (0),
+    m_GESNum (0)
 {
   m_queueFactory.SetTypeId ("ns3::DropTailQueue");
   m_deviceFactory.SetTypeId ("ns3::PointToPointNetDevice");
@@ -422,7 +426,7 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
   if (m_nodeListIterator != m_nodeList.end())
     {
-     std::cout << "===node b already in the list : " << *m_nodeListIterator << '\n';
+     NS_LOG_UNCOND( "===node b already in the list : " << *m_nodeListIterator );
      devBSecond->Attach (channel);
      container.Add (devBSecond);
     }
@@ -480,7 +484,7 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
     {
      //devB = b->GetDevice(0);
      devB  = m_nodeDeviceMap.find (b->GetId ())->second;
-     std::cout << "...node b already in the list : " << devB->GetAddress () << '\n';
+     NS_LOG_UNCOND ("...node b already in the list : " << devB->GetAddress () );
     }
   else
     {
@@ -488,9 +492,7 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      
      devB = m_deviceFactory.Create<PointToPointNetDevice> ();
      devB->SetAddress (Mac48Address::Allocate ());
-               NS_LOG_UNCOND( "AddDevice before " );
      b->AddDevice (devB);
-          NS_LOG_UNCOND( "AddDevice after " );
 
      m_nodeDeviceMap[b->GetId ()] = devB;
      NS_LOG_UNCOND( "node " << b->GetId () << " install device, number " << b->GetNDevices () );
@@ -501,7 +503,6 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
      devB->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
     }
-          NS_LOG_UNCOND ("Attach start 0");
 
 
   //Ptr<PointToPointNetDevice> devA = m_deviceFactory.Create<PointToPointNetDevice> ();
@@ -549,11 +550,9 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
       devA->AggregateObject (mpiRecA);
       devB->AggregateObject (mpiRecB);
     } */
-        NS_LOG_UNCOND ("Attach start");
 
   devA->Attach (channel, 0); //0 transmitter
   devB->Attach (channel, 1); //1 receiver 
-        NS_LOG_UNCOND ("Attach over");
 
   
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
@@ -578,7 +577,8 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      //std::cout << "===node b not in the list : \n";
      m_nodeList.push_back(b);
      m_containerUni.Add (devB);
-    }
+    }  
+  
   return m_containerUni;
 }
 
@@ -586,11 +586,16 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
 //happens after leo device is installed
 NetDeviceContainer
 PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
-{            
+{   
+  /*
   Ptr<PointToPointNetDeviceGES> devA = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
   devA->IsBroadcast ();
   devA->SetAddress (Mac48Address::Allocate ());
-  a->AddDevice (devA);
+  a->AddDevice (devA); */
+  
+  NS_LOG_UNCOND (" ------------------------------------------------------------- ");
+  NS_LOG_UNCOND (" node " << a->GetId () << " add GES station with node " << b->GetId ());
+
 
   uint16_t Ndevice; 
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), a);
@@ -598,6 +603,26 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
    {
        m_nodeList.push_back(a);
    }
+  
+  
+  
+  //Ptr<PointToPointNetDeviceGES> devA;
+  m_nodeGESIterator = m_nodeGESDeviceMap.find (a->GetId ());
+  if ( m_nodeGESIterator == m_nodeGESDeviceMap.end ())
+  {
+      Ptr<PointToPointNetDeviceGES> devA = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
+      m_nodeGESDeviceMap[a->GetId ()] = devA;
+      devA->SetAddress (Mac48Address::Allocate ());
+      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+      devA->SetQueue (queueA);
+  
+      a->AddDevice (devA);
+      
+        m_containerGES.Add (devA);
+
+  }
+  
+  
   Ndevice = a->GetNDevices ();
   NS_LOG_UNCOND (a->GetId () << " GES station has device " << Ndevice);
  
@@ -610,13 +635,29 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
       NS_ASSERT ("incorrect device number");
    } 
   
-  Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
-  devA->SetQueue (queueA);
+  //Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+  //devA->SetQueue (queueA);
 
   
-  Ptr<PointToPointNetDeviceGES> devB = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
-  devB->SetAddress (Mac48Address::Allocate ());
-  b->AddDevice (devB);
+  //Ptr<PointToPointNetDeviceGES> devB;
+  m_nodeGESIterator = m_nodeGESDeviceMap.find (b->GetId ());
+  if ( m_nodeGESIterator == m_nodeGESDeviceMap.end ())
+  {
+      Ptr<PointToPointNetDeviceGES> devB = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
+      m_nodeGESDeviceMap[b->GetId ()] = devB;
+      devB->SetAddress (Mac48Address::Allocate ());
+      Ptr<Queue> queueB = m_queueFactory.Create<Queue> ();
+      devB->SetQueue (queueB);
+      b->AddDevice (devB);
+      NS_LOG_UNCOND (b->GetId () << " leo first add geo  " );
+      
+        m_containerGES.Add (devB);
+
+  }
+          
+  //Ptr<PointToPointNetDeviceGES> devB = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
+  //devB->SetAddress (Mac48Address::Allocate ());
+  //b->AddDevice (devB);
   
   Ndevice = b->GetNDevices ();
   NS_LOG_UNCOND (b->GetId () << " leo station has device " << Ndevice);
@@ -632,6 +673,7 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
         // node b is LEO station, only has GES device and LEO device
         //for bi, only one leo device connect to ges
         Ptr<PointToPointNetDevice> dev0  = m_nodeDeviceMap.find (b->GetId ())->second;
+        Ptr<PointToPointNetDeviceGES> devB  = m_nodeGESDeviceMap.find (b->GetId ())->second;
         devB->AddDevice0 (dev0);
         dev0->AddGESDevice (devB);
     }
@@ -641,13 +683,13 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
    } 
   
     
-  Ptr<Queue> queueB = m_queueFactory.Create<Queue> ();
-  devB->SetQueue (queueB);
+  //Ptr<Queue> queueB = m_queueFactory.Create<Queue> ();
+  //devB->SetQueue (queueB);
   // If MPI is enabled, we need to see if both nodes have the same system id 
   // (rank), and the rank is the same as this instance.  If both are true, 
   //use a normal p2p channel, otherwise use a remote channel
-  bool useNormalChannel = true;
   //Ptr<PointToPointChannel> channel = 0;
+  bool useNormalChannel = true;
   Ptr<PointToPointChannelGES> channel = 0;
 
   if (MpiInterface::IsEnabled ())
@@ -661,10 +703,12 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
         }
       NS_LOG_UNCOND ("MpiInterface::IsEnabled");
     }
-  if (useNormalChannel)
+  if (useGESChannel)
     {
       //channel = m_channelFactory.Create<PointToPointChannel> ();
       channel = m_channelGESFactory.Create<PointToPointChannelGES> ();
+      m_channelGES = m_channelGESFactory.Create<PointToPointChannelGES> (); //temp
+      useGESChannel = false;
     }
   /*else
     {
@@ -677,16 +721,90 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
       devB->AggregateObject (mpiRecB);
     } */
 
-    
-  devA->Attach (channel);
-  devB->Attach (channel);
-  m_containerGES.Add (devA);
-  m_containerGES.Add (devB);
-  
-  NS_LOG_UNCOND ("... ...");
+  Ptr<PointToPointNetDeviceGES> devA  = m_nodeGESDeviceMap.find (a->GetId ())->second;
+  Ptr<PointToPointNetDeviceGES> devB  = m_nodeGESDeviceMap.find (b->GetId ())->second;
 
+  devA->Attach (m_channelGES);
+  devB->Attach (m_channelGES);
+  
+   //m_nodeGESIterator = m_nodeGESDeviceMap.find (b->GetId ())->Second;
+
+    
+  m_channelGES->Attach (m_nodeGESDeviceMap.find (a->GetId ())->second, m_nodeGESDeviceMap.find (b->GetId ())->second);
+  //m_containerGES.Add (devA);
+  //m_containerGES.Add (devB);
+  
   return m_containerGES; 
 }
+
+
+
+//happens after leo device is installed
+void
+PointToPointHelper::InitTopologyGES (uint32_t LEONUM, uint32_t GESNUM, uint32_t GESPos[], Time PosShiftInterval)
+{     
+  NS_LOG_UNCOND (" InitTopologyGES ------------------------------------------------------------- ");
+  NS_ASSERT (LEONUM + GESNUM == m_nodeList.size ());
+  uint32_t pos = 1;
+  std::list< Ptr<Node> >::iterator it;
+  for (it = m_nodeList.begin(); it != m_nodeList.end(); ++it)
+    {
+      uint32_t nodeid = (*it)->GetId ();
+      //LEO
+      if (nodeid < LEONUM)
+      {
+        Ptr<PointToPointNetDeviceGES> dev = m_nodeGESDeviceMap.find (nodeid)->second;
+        
+        Mac48Address addr = Mac48Address::ConvertFrom (dev->GetAddress () );
+        m_LEOdeviceMapPosition[m_LEONum] = addr; 
+        
+        m_initPosLES [m_LEONum] = pos; //position of LEO can be defined. same as nodes id.
+         pos <<= 1;       
+        m_LEONum++;
+      }
+      //GES
+      else
+      {
+        Ptr<PointToPointNetDeviceGES> dev = m_nodeGESDeviceMap.find (nodeid)->second;
+        
+        Mac48Address addr = Mac48Address::ConvertFrom (dev->GetAddress () );
+        m_GESdeviceMapPosition[m_GESNum] = addr; 
+        m_GESNum++; 
+      }
+    }
+          
+  uint32_t GES_index = 0;
+  uint32_t LEO_index = 0;
+  for (it = m_nodeList.begin(); it != m_nodeList.end(); ++it)
+    {
+      uint32_t nodeid = (*it)->GetId ();
+      //LEO
+      if (nodeid < LEONUM)
+      {
+        Ptr<PointToPointNetDeviceGES> dev = m_nodeGESDeviceMap.find (nodeid)->second;
+        //  LEO_index 
+        NS_LOG_UNCOND (" LEO_index " << LEO_index);
+        NS_LOG_UNCOND (" m_initPosLES[LEO_index] " << m_initPosLES[LEO_index]);
+        dev->LEOInitLinkDst (m_initPosLES[LEO_index], GESPos, m_GESdeviceMapPosition, GESNUM, LEONUM, PosShiftInterval);
+        LEO_index++; 
+      }
+      //GES
+      else
+      {  
+        Ptr<PointToPointNetDeviceGES> dev = m_nodeGESDeviceMap.find (nodeid)->second;
+        //  GES_index can also be derived from dev and m_GESdeviceMapPosition, just convert dev to Mac48Address
+        NS_LOG_UNCOND (" GES_index " << GES_index);
+        NS_LOG_UNCOND (" GESPos[GES_index] " << GESPos[GES_index]);
+        dev->InitLinkDst (GESPos[GES_index], m_initPosLES, m_LEOdeviceMapPosition, LEONUM, PosShiftInterval);
+        
+        GES_index++;  
+      }
+     NS_LOG_UNCOND (" (*it)->GetId () " << (*it)->GetId ());
+    }
+  
+  //PointToPointNetDeviceGES::InitLinkDst (uint32_t position, uint32_t InitPosLES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumLEO, Time interval) 
+}
+
 
 
 NetDeviceContainer 

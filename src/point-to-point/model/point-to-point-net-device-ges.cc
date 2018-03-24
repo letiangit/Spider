@@ -169,6 +169,11 @@ PointToPointNetDeviceGES::GetTypeId (void)
                      "attached to the device",
                      MakeTraceSourceAccessor (&PointToPointNetDeviceGES::m_promiscSnifferTrace),
                      "ns3::Packet::TracedCallback")
+    .AddTraceSource ("RecPacketTrace",
+                    "Channel has been successfully Selected"
+                    "The header of successfully transmitted packet",
+                    MakeTraceSourceAccessor (&PointToPointNetDeviceGES::m_recPacketTrace),
+                    "ns3::PointToPointNetDevice::RecPacketCallback")
   ;
   return tid;
 }
@@ -251,7 +256,7 @@ PointToPointNetDeviceGES::SetInterframeGap (Time t)
 }
 
 bool
-PointToPointNetDeviceGES::TransmitStart (Ptr<Packet> p)
+PointToPointNetDeviceGES::TransmitStart (Ptr<Packet> p, Mac48Address dst)
 {
   NS_LOG_FUNCTION (this << p);
   NS_LOG_LOGIC ("UID is " << p->GetUid () << ")");
@@ -271,8 +276,35 @@ PointToPointNetDeviceGES::TransmitStart (Ptr<Packet> p)
 
   NS_LOG_LOGIC ("Schedule TransmitCompleteEvent in " << txCompleteTime.GetSeconds () << "sec");
   Simulator::Schedule (txCompleteTime, &PointToPointNetDeviceGES::TransmitComplete, this);
-
-  bool result = m_channel->TransmitStart (p, this, txTime);
+  NS_LOG_UNCOND (GetAddress () << " send to another end " << dst);
+  if ( m_DevSameNode0Flag) //attached to LEO
+    {
+      //input dst is not used, 24032018
+      dst = m_dstGESAddr;
+    }
+  else //attached to GES
+    { 
+      dst = m_dstLEOAddr;
+    }
+  
+    NS_LOG_UNCOND (GetAddress () << " send to another end " << dst);
+  
+  if (!m_DevSameNode0Flag && dst == Mac48Address ("00:00:00:00:00:00") ) //unreachable dst
+    {
+      NS_ASSERT ("GES is not connected to any satellite");
+    }
+  
+   bool result;
+  if ( dst == Mac48Address ("00:00:00:00:00:00") )//unreachable dst
+    {
+        result = false;
+        NS_LOG_UNCOND ("LEO " << GetAddress () << " is not connected to any GES");
+    }
+  else
+    {
+        result = m_channel->TransmitStart (p, this, dst ,txTime);
+    }  
+            
   if (result == false)
     {
       m_phyTxDropTrace (p);
@@ -307,13 +339,16 @@ PointToPointNetDeviceGES::TransmitComplete (void)
       //
       return;
     }
+  
+  PppHeader ppp;
+  p->PeekHeader (ppp);
 
   //
   // Got another packet off of the queue, so start the transmit process agin.
   //
   m_snifferTrace (p);
   m_promiscSnifferTrace (p);
-  TransmitStart (p);
+  TransmitStart (p, ppp.GetDestAddre ());
 }
 
 bool
@@ -323,7 +358,7 @@ PointToPointNetDeviceGES::Attach (Ptr<PointToPointChannelGES> ch)
 
   m_channel = ch;
 
-  m_channel->Attach (this);
+  //m_channel->Attach (this);
 
   //
   // This device is up whenever it is attached to a channel.  A better plan
@@ -404,17 +439,21 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
                 {
                    ProcessHeader (CopyPacket, protocol);
                    m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+
                    NS_LOG_UNCOND (GetAddress () << " GES upload broadcast packet to upper layer");
                 }
             else if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress ()))
                 {
                    ProcessHeader (CopyPacket, protocol);
                    m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
                 }
             m_DevSameNode0->ReceiveFromGES (packet);
             NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet 2" );
         }
-      else
+      else if  (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ) || ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
+
       {
       // 
       // Hit the trace hooks.  All of these hooks are in the same place in this 
@@ -449,8 +488,14 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
       m_macRxTrace (originalPacket);
       NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet 2...." << protocol );
       m_rxCallback (this, packet, protocol, GetRemote ());
+      m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+          NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", after.... " );
       }
     } 
+  
+  
+    NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", after.... " );
+
 }
 
 
@@ -509,13 +554,15 @@ PointToPointNetDeviceGES::ReceiveFromLEO (Ptr<Packet> packet)
             if (ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
                 {
                    ProcessHeader (CopyPacket, protocol);
-                   m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                   //m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
                    NS_LOG_UNCOND (GetAddress () << " GES upload broadcast packet to upper layer");
                 }
             else if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress ()))
                 {
                    ProcessHeader (CopyPacket, protocol);
-                   m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                   //m_rxCallback (this, CopyPacket, protocol, GetRemote ());
+                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
                 }
             //m_DevSameNode0->ReceiveFromGES (packet);
             Forward (packet);
@@ -671,6 +718,7 @@ PointToPointNetDeviceGES::Send (
   if (IsLinkUp () == false)
     {
       m_macTxDropTrace (packet);
+      NS_LOG_UNCOND ( ", IsLinkUp No !! ");
       return false;
     }
   
@@ -711,7 +759,7 @@ PointToPointNetDeviceGES::Send (
           packet = m_queue->Dequeue ();
           m_snifferTrace (packet);
           m_promiscSnifferTrace (packet);
-          return TransmitStart (packet);
+          return TransmitStart (packet, m_destAddress);
         }
 
       return true;
@@ -785,10 +833,33 @@ Address
 PointToPointNetDeviceGES::GetRemote (void) const
 {
   NS_LOG_FUNCTION (this);
-  NS_ASSERT (m_channel->GetNDevices () == 2);
+  //NS_ASSERT (m_channel->GetNDevices () == 2); // GetRemote () is changed, this may affect rxcallback
+  NS_LOG_UNCOND (GetAddress () << " GetRemote " << m_channel->GetNDevices ()); 
+  
+  Mac48Address dst;
+  if ( m_DevSameNode0Flag) //attached to LEO
+    {
+      //input dst is not used, 24032018
+      dst = m_dstGESAddr;
+    }
+  else //attached to GES
+    { 
+      dst = m_dstLEOAddr;
+    }
+  
+  if (dst == Mac48Address ("00:00:00:00:00:00") ) //unreachable dst
+    {
+      NS_ASSERT ("do not have remote currently");
+    }
+  
+  return dst;
+  
+   // below is not used ay more.  
   for (uint32_t i = 0; i < m_channel->GetNDevices (); ++i)
     {
       Ptr<NetDevice> tmp = m_channel->GetDevice (i);
+      NS_LOG_UNCOND (i << " , " << tmp->GetAddress ()); 
+
       if (tmp != this)
         {
           return tmp->GetAddress ();
@@ -869,10 +940,188 @@ PointToPointNetDeviceGES::Forward (Ptr<Packet> packet)
    
   if (m_txMachineState == READY)
      {
-       TransmitStart (packet);
+       PppHeader ppp;
+       packet->PeekHeader (ppp);
+  
+       TransmitStart (packet, ppp.GetDestAddre () );
      }   
 }
 
 
+
+
+void 
+PointToPointNetDeviceGES::InitLinkDst (uint32_t position, uint32_t InitPosLES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumLEO, Time interval)
+{
+
+       m_indicator = position;
+       //NS_LOG_UNCOND ("m_indicator " << m_indicator);
+       //m_initPosLES = &InitPosLES; 
+       m_deviceMapPosition = DeviceMapPosition;
+
+       m_NumLEO = NumLEO;
+       m_dstLEOinterval = interval;
+       
+       
+       
+        uint32_t sum = 0;
+        for (uint32_t kk = 0; kk < m_NumLEO; kk++)
+            {
+                m_initPosLES[kk] = InitPosLES[kk];
+                sum = sum + m_initPosLES[kk];
+            }
+         NS_ASSERT (sum = pow(2,m_NumLEO - 1));
+         
+         updateLinkDst ();
+}
+//position of mine
+void 
+PointToPointNetDeviceGES::updateLinkDst ( )
+{
+        /*    
+       //input but already know     
+        m_InitPosLES[0] = 0b00000000001; // initial position of the LES, they are same for all the GES
+        m_InitPosLES[1] = 0b00000000010; // and apparently known (it is defined in this way), then the m_InitPos_dstGES follows.
+        m_InitPosLES[2] = 0b00000000100;
+        ...
+        m_InitPosLES[10] = 0b10000000000;
+    
+        //input
+        Indicator = 0b00000000001; // my position, sh
+        */ 
+    
+         //NS_LOG_UNCOND (GetAddress () << "update link at " << Simulator::Now () << "  " <<  m_NumLEO);
+
+    
+       //fixed below
+        uint32_t sum = 0;
+        uint32_t leo = 0;
+        uint32_t leoP = 0;
+        for (uint32_t  kk = 0; kk < m_NumLEO; kk++)
+            {
+                //NS_LOG_UNCOND ("m_linkDst " << kk << ", " << m_initPosLES[kk] << ", " << m_indicator);
+                m_linkDst[kk] = m_initPosLES[kk] & m_indicator;
+                if (m_linkDst[kk] != 0)
+                 {
+                    leoP = leo; //get dst LEO
+                 }
+                leo++;
+                //NS_LOG_UNCOND ("m_linkDst " << m_linkDst[kk] );
+                sum = sum + m_linkDst[kk] ;
+            }
+        //check 
+        uint32_t count = 0;
+        while (sum)
+          {
+             count += sum & 1;
+             sum = sum >> 1;
+          }
+        NS_ASSERT (count == 1);
+        
+        
+      
+        //use DeviceMapPosition to get device
+
+        
+        m_dstLEOAddr = m_deviceMapPosition.find (leoP)->second;
+        NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " GES links to LEO "  << m_dstLEOAddr);
+        // Circular
+        // example, Assuming that CHAR_BITS == 8, x = ( x << 1U ) | ( x >> 7U ) ; would do a circular bit shift left by one.
+        //m_indicator << 1;
+        m_indicator = (m_indicator << 1) | (m_indicator >>  (m_NumLEO - 1) ); 
+        GESupdateLinkDstEvent = Simulator::Schedule (m_dstLEOinterval, &PointToPointNetDeviceGES::updateLinkDst, this);
+}
+
+
+
+
+//attached to LEO satellite
+void 
+PointToPointNetDeviceGES::LEOInitLinkDst (uint32_t position, uint32_t InitPosGES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumGES, uint32_t NumLEO, Time interval)
+{
+       m_indicator = position;
+       m_initPostion = position;
+       //m_initPosLES = &InitPosLES; 
+       m_deviceMapPosition = DeviceMapPosition;
+
+       m_NumGES = NumGES;
+       m_NumLEO = NumLEO;
+       m_dstGESinterval = interval;
+       
+       
+       
+        uint32_t sum = 0;
+        uint32_t count = 0;
+        for (uint32_t kk = 0; kk < m_NumGES; kk++)
+            {
+                m_initPosGES[kk] = InitPosGES[kk];
+                //NS_LOG_UNCOND ("position " << position << ", NumGES " << NumGES);
+                //NS_LOG_UNCOND ("kk " << kk << ", m_initPosGES " << m_initPosGES[kk]);
+                sum = sum + m_initPosGES[kk];
+            }
+        
+        while (sum)
+          {
+             count += sum & 1;
+             sum = sum >> 1;
+          }
+        NS_ASSERT (count == m_NumGES);
+         
+         LEOupdateLinkDst ();
+}
+//position of mine
+void 
+PointToPointNetDeviceGES::LEOupdateLinkDst ( )
+{
+       //fixed below
+        uint32_t sum = 0;
+        uint32_t ges = 0; //the ges can be linked to
+        bool connected = false;
+        for (uint32_t  kk = 0; kk < m_NumGES; kk++)
+            {
+                //NS_LOG_UNCOND (GetAddress () << "\t" << m_indicator  << " m_initPosGES[kk] "  << m_initPosGES[kk] << ", m_NumLEO " << m_NumLEO);
+                m_linkDst[kk] = m_initPosGES[kk] & m_indicator;
+                sum = sum + m_linkDst[kk] ;
+            }
+        
+           for (uint32_t  kk = 0; kk < m_NumGES; kk++)
+            {
+                if (m_linkDst[kk] !=0 )
+                 {
+                    connected = true;
+                    break;
+                 }
+                ges++;
+            }
+        
+        //check 
+        uint32_t count = 0;
+        while (sum)
+          {
+             count += sum & 1;
+             sum = sum >> 1;
+          }
+        NS_ASSERT (count == 1 || count == 0);
+        
+       
+        if (connected)
+        {
+          m_dstGESAddr = m_deviceMapPosition.find (ges)->second;
+          NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " LEO links to GES "  << m_dstGESAddr);
+        }
+        else
+        {
+          m_dstGESAddr = Mac48Address ("00:00:00:00:00:00"); //unreachable dst
+        }
+        
+        // Circular
+        // example, Assuming that CHAR_BITS == 8, x = ( x << 1U ) | ( x >> 7U ) ; would do a circular bit shift left by one.
+        //m_indicator << 1;
+        uint32_t indicator_a = m_indicator;
+        uint32_t indicator_b = m_indicator;
+        m_indicator = (indicator_a >> 1) | (indicator_b <<  (m_NumLEO - 1) );
+        
+        LEOupdateLinkDstEvent = Simulator::Schedule (m_dstGESinterval, &PointToPointNetDeviceGES::LEOupdateLinkDst, this);
+}
 
 } // namespace ns3

@@ -200,7 +200,6 @@ main (int argc, char *argv[])
    {
        nodei = kk;
        nodej = (kk + 1) % Nnodes;
-       NS_LOG_UNCOND (">>>>>nodei " << nodei << ", nodej " << nodej << ", kk " << kk);
        if  (UniChannel)
        {
           devicesSet = pointToPoint.InstallUni (nodes.Get(nodei), nodes.Get(nodej));
@@ -214,7 +213,7 @@ main (int argc, char *argv[])
   NS_LOG_UNCOND ("install devicesSet finish " << nodes.Get(Nnodes-1)->GetId () << "\t" << nodes.Get(0)->GetId ()  << ", size " << devicesSet.GetN () );
   //install GES and LEO
   NodeContainer nodesGES;
-  uint32_t NGESnodes = 1;
+  uint32_t NGESnodes = 2;
   nodesGES.Create (NGESnodes);
   NetDeviceContainer devicesSetGES;
     
@@ -226,6 +225,13 @@ main (int argc, char *argv[])
         }
     }
     
+    NS_LOG_UNCOND ("Start channel selection ----------- Nnodes 2 " );
+
+    uint32_t GESPos[NGESnodes];
+    GESPos[0]=0b000000001;
+    GESPos[1]=0b100000000;
+    
+    pointToPoint.InitTopologyGES (Nnodes, NGESnodes, GESPos, Seconds (100));
 
 
   for (uint32_t kk = 0; kk < NexternalSel; kk++)
@@ -239,23 +245,30 @@ main (int argc, char *argv[])
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDevice/ChannelSelected", MakeCallback (&ChannelSelection));
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDevice/RecPacketTrace", MakeCallback (&RecPacket));
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDeviceGES/RecPacketTrace", MakeCallback (&RecPacketGES));
-    
-    
+    NS_LOG_UNCOND ("Start channel selection ----------- Nnodes 3" );
 
+    
+    
     SpiderClient clientApp;
 
-    clientApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(10)->GetDevice(1)->GetAddress()) );
+    clientApp.SetRemote (Mac48Address::ConvertFrom (nodesGES.Get(1)->GetDevice(0)->GetAddress()) );
+
     clientApp.SetMaxPackets (1000);
     clientApp.SetInterval (Seconds(100));
     clientApp.SetPacketSize (2000);
-    clientApp.InstallDevice (nodes.Get(0)->GetDevice(1));
+    clientApp.InstallDevice (nodes.Get(0)->GetDevice(0));
+    
+    //NGESnodes; nodesGES
     
     SpiderServer ServerApp;
-    ServerApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(0)->GetDevice(1)->GetAddress()) );
-    ServerApp.InstallDevice (nodes.Get(10)->GetDevice(1));
-
-
-
+    ServerApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(0)->GetDevice(0)->GetAddress()) );
+    ServerApp.InstallDevice (nodesGES.Get(1)->GetDevice(0));
+   
+    clientApp.StartApplication (Seconds (0.0));
+    clientApp.StopApplication (Seconds (1000.0));
+     
+    ServerApp.StartApplication (Seconds (0.0));
+    ServerApp.StopApplication (Seconds (1000.0));
 
     NS_LOG_UNCOND ("Start channel selection ----------- Nnodes " );
 
@@ -271,31 +284,20 @@ main (int argc, char *argv[])
     
   for (uint32_t kk = 0; kk < Nnodes; kk++)
     {
-        //NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodes.Get(kk)->GetId () << ", device " << nodes.Get(kk)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(1)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(2)->GetAddress()  );
+        NS_LOG_UNCOND( "LEO ----------- Nnodes " << nodes.Get(kk)->GetId () << ", device " << nodes.Get(kk)->GetDevice(0)->GetAddress() << ",  " << nodes.Get(kk)->GetDevice(1)->GetAddress()  );
     }
     
   for (uint32_t ii = 0; ii < NGESnodes; ii++)
     {
-        for (uint32_t kk = 0; kk < Nnodes; kk++)
-        {
-            NS_LOG_UNCOND( "nodes ----------- Nnodes " << nodesGES.Get(ii)->GetId () << ", device " << nodesGES.Get(ii)->GetDevice(kk)->GetAddress()  );
-        }
+        NS_LOG_UNCOND( "GES ----------- Nnodes " << nodesGES.Get(ii)->GetId () << ", device " << nodesGES.Get(ii)->GetDevice(0)->GetAddress()  );
     }
 
 
-    
-    for (uint32_t kk = 0; kk < 2*Nnodes; kk++)
-    {
-        NS_LOG_UNCOND( "devicesSetGES " << devicesSetGES.GetN () );
-    }
+
     
   NS_LOG_UNCOND ("install devicesSet finish ....."  );
     
-    clientApp.StartApplication (Seconds (100.0));
-    clientApp.StopApplication (Seconds (1000.0));
-    
-    ServerApp.StartApplication (Seconds (100.0));
-    ServerApp.StopApplication (Seconds (1000.0));
+
     
     Simulator::Stop (Seconds (1000.0));
 

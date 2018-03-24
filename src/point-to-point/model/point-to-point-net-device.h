@@ -270,6 +270,8 @@ public:
   void AddGESDevice (Ptr<PointToPointNetDeviceGES> dev);
   
   void ReceiveFromGES (Ptr<Packet> packet);
+  
+
     
 
 
@@ -678,6 +680,9 @@ private:
     uint32_t * tablePoint;
     uint8_t m_Qos;
     bool m_GESSameNodeFlag;
+    
+    
+
 
 };
 

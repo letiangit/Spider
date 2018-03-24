@@ -26,6 +26,10 @@
 #include "ns3/traced-callback.h"
 #include "point-to-point-channel.h"
 #include "ns3/ptr.h"
+#include "ns3/mac48-address.h"
+
+#include <map>
+#include <list>
 
 
 namespace ns3 {
@@ -71,7 +75,7 @@ public:
    * \brief Attach a given netdevice to this channel
    * \param device pointer to the netdevice to attach to the channel
    */
-  void Attach (Ptr<PointToPointNetDeviceGES> device);
+  void Attach (Ptr<PointToPointNetDeviceGES> deviceA, Ptr<PointToPointNetDeviceGES> deviceB);
 
   /**
    * \brief Transmit a packet over this channel
@@ -80,7 +84,7 @@ public:
    * \param txTime Transmit time to apply
    * \returns true if successful (currently always true)
    */
-  virtual bool TransmitStart (Ptr<Packet> p, Ptr<PointToPointNetDeviceGES> src, Time txTime);
+  virtual bool TransmitStart (Ptr<Packet> p, Ptr<PointToPointNetDeviceGES> src, Mac48Address dst, Time txTime);
 
   /**
    * \brief Get number of devices on this channel
@@ -147,10 +151,15 @@ protected:
                     
 private:
   /** Each point to point link has exactly two net devices. */
-  static const int N_DEVICES = 2;
+  static const int N_DEVICES = 1000;
 
   Time          m_delay;    //!< Propagation delay
   int32_t       m_nDevices; //!< Devices of this channel
+  
+  std::list< Ptr<PointToPointNetDeviceGES> > m_deviceList;
+  std::list< Ptr<PointToPointNetDeviceGES> >::iterator m_deviceListIterator;
+  std::map<Ptr<PointToPointNetDeviceGES>, uint32_t> m_DeviceLinkMap;
+
 
   /**
    * The trace source for the packet transmission animation events that the 
@@ -199,7 +208,7 @@ public:
     Ptr<PointToPointNetDeviceGES> m_dst;   //!< Second NetDevice
   };
 
-  Link    m_link[N_DEVICES]; //!< Link model
+  Link    m_link[N_DEVICES][N_DEVICES]; //!< Link model
 };
 
 } // namespace ns3

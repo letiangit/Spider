@@ -1843,7 +1843,7 @@ PointToPointNetDevice::CreateRoutingTable ()
     for (uint32_t kk=0; kk< V; kk++ )
       {
         if (aid-1 != kk)
-          NS_LOG_DEBUG( "src " << aid-1 <<  ", dest " << kk << ", next hop " <<  *(tablePoint+kk) );
+          NS_LOG_UNCOND( "src " << aid-1 <<  ", dest " << kk << ", next hop " <<  *(tablePoint+kk) );
       } 
     }
 }
@@ -3097,5 +3097,9 @@ PointToPointNetDevice::AddGESDevice (Ptr<PointToPointNetDeviceGES> deva)
   m_GESSameNode = deva;
   NS_LOG_UNCOND (GetAddress () << " has GESDEVICE " << m_GESSameNode->GetAddress() );
 }
+
+
+
+
  
 } // namespace ns3
