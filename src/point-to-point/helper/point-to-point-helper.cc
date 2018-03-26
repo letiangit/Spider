@@ -802,6 +802,26 @@ PointToPointHelper::InitTopologyGES (uint32_t LEONUM, uint32_t GESNUM, uint32_t 
      NS_LOG_UNCOND (" (*it)->GetId () " << (*it)->GetId ());
     }
   
+   
+    LEO_index = 0; // allow LEO device to have globe view of 
+    for (it = m_nodeList.begin(); it != m_nodeList.end(); ++it)
+    {
+      uint32_t nodeid = (*it)->GetId ();
+      //LEO
+      if (nodeid < LEONUM)
+      {
+        Ptr<PointToPointNetDevice> dev = m_nodeDeviceMap.find (nodeid)->second;
+        //  LEO_index 
+        NS_LOG_UNCOND (" LEO_index " << LEO_index);
+        NS_LOG_UNCOND (" m_initPosLES[LEO_index] " << m_initPosLES[LEO_index]);
+        dev->LEOInitLinkDst (m_initPosLES[LEO_index], GESPos, m_GESdeviceMapPosition, GESNUM, LEONUM, PosShiftInterval);
+        LEO_index++; 
+      }
+     
+     NS_LOG_UNCOND (" (*it)->GetId () " << (*it)->GetId ());
+    }
+    
+  
   //PointToPointNetDeviceGES::InitLinkDst (uint32_t position, uint32_t InitPosLES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumLEO, Time interval) 
 }
 

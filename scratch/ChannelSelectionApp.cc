@@ -56,12 +56,12 @@ RecPacket  (std::string contex, Mac48Address addr, Mac48Address from, Mac48Addre
 }
 
 void
-RecPacketGES  (std::string contex, Mac48Address addr, Mac48Address from, Mac48Address to, Time ts, uint32_t size, uint32_t protocol)
+RecPacketGES  (std::string contex, Mac48Address addr, Mac48Address from, Mac48Address to, Time ts, uint32_t size, uint32_t protocol, Mac48Address linkedLEO)
 {
     std::ofstream myfile;
     std::string dropfile=m_Outputpath;
     myfile.open (dropfile, ios::out | ios::app);
-    myfile << ts << "\t GES "  << addr << " receives packet from "  << from  << " to " << to  << ", size "  <<  size << ",  protocol " << protocol << "\n";
+    myfile << ts << "\t GES "  << addr << " receives packet from "  << from  << " to " << to  << ", size "  <<  size << ",  protocol " << protocol << ", visalbe to " <<  linkedLEO << "\n";
     myfile.close();
 }
 
@@ -246,23 +246,27 @@ main (int argc, char *argv[])
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDevice/RecPacketTrace", MakeCallback (&RecPacket));
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::PointToPointNetDeviceGES/RecPacketTrace", MakeCallback (&RecPacketGES));
     NS_LOG_UNCOND ("Start channel selection ----------- Nnodes 3" );
+    
+    
+    Config::Set ("/NodeList/*/DeviceList/0/$ns3::PointToPointNetDevice/m_queue/MaxPackets", UintegerValue (20)); //DropTailQueue
+
 
     
     
     SpiderClient clientApp;
 
-    clientApp.SetRemote (Mac48Address::ConvertFrom (nodesGES.Get(1)->GetDevice(0)->GetAddress()) );
+    clientApp.SetRemote (Mac48Address::ConvertFrom (nodesGES.Get(0)->GetDevice(0)->GetAddress()) );
 
     clientApp.SetMaxPackets (1000);
     clientApp.SetInterval (Seconds(100));
     clientApp.SetPacketSize (2000);
-    clientApp.InstallDevice (nodes.Get(0)->GetDevice(0));
+    clientApp.InstallDevice (nodesGES.Get(1)->GetDevice(0));
     
     //NGESnodes; nodesGES
     
     SpiderServer ServerApp;
-    ServerApp.SetRemote (Mac48Address::ConvertFrom (nodes.Get(0)->GetDevice(0)->GetAddress()) );
-    ServerApp.InstallDevice (nodesGES.Get(1)->GetDevice(0));
+    ServerApp.SetRemote (Mac48Address::ConvertFrom (nodesGES.Get(1)->GetDevice(0)->GetAddress()) );
+    ServerApp.InstallDevice (nodesGES.Get(0)->GetDevice(0));
    
     clientApp.StartApplication (Seconds (0.0));
     clientApp.StopApplication (Seconds (1000.0));

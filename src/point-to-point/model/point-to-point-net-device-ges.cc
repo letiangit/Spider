@@ -439,7 +439,7 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
                 {
                    ProcessHeader (CopyPacket, protocol);
                    m_rxCallback (this, CopyPacket, protocol, GetRemote ());
-                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol, m_dstLEOAddr);
 
                    NS_LOG_UNCOND (GetAddress () << " GES upload broadcast packet to upper layer");
                 }
@@ -447,7 +447,7 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
                 {
                    ProcessHeader (CopyPacket, protocol);
                    m_rxCallback (this, CopyPacket, protocol, GetRemote ());
-                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol, m_dstLEOAddr);
                 }
             m_DevSameNode0->ReceiveFromGES (packet);
             NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet 2" );
@@ -488,7 +488,7 @@ PointToPointNetDeviceGES::Receive (Ptr<Packet> packet)
       m_macRxTrace (originalPacket);
       NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", receive GES data packet 2...." << protocol );
       m_rxCallback (this, packet, protocol, GetRemote ());
-      m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+      m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol, m_dstLEOAddr);
           NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", after.... " );
       }
     } 
@@ -555,14 +555,14 @@ PointToPointNetDeviceGES::ReceiveFromLEO (Ptr<Packet> packet)
                 {
                    ProcessHeader (CopyPacket, protocol);
                    //m_rxCallback (this, CopyPacket, protocol, GetRemote ());
-                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol, m_dstLEOAddr);
                    NS_LOG_UNCOND (GetAddress () << " GES upload broadcast packet to upper layer");
                 }
             else if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress ()))
                 {
                    ProcessHeader (CopyPacket, protocol);
                    //m_rxCallback (this, CopyPacket, protocol, GetRemote ());
-                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+                   m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol, m_dstLEOAddr);
                 }
             //m_DevSameNode0->ReceiveFromGES (packet);
             Forward (packet);

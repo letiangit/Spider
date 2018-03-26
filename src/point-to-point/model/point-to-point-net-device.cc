@@ -253,6 +253,8 @@ PointToPointNetDevice::PointToPointNetDevice ()
     m_reqid (0),
     m_nextHop0( Mac48Address::ConvertFrom (GetBroadcast() )),
     m_nextHop1(Mac48Address::ConvertFrom (GetBroadcast() )),
+    m_topologyCompleted (false),
+    m_TopoInitialized (false),
     m_currentPkt (0)
 {
   NS_LOG_FUNCTION (this);
@@ -787,7 +789,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
       {
           if (m_channel->IsChannelUni())
             {
-                NS_LOG_DEBUG ("Forward LINKSTATE packet " << ppp.GetDestAddre () );  
+                NS_LOG_UNCOND (GetAddress () << " Forward LINKSTATE packet " << ppp.GetDestAddre () << " from " << ppp.GetSourceAddre ()  );  
                 Forward (packet, PACKETREPEATNUMBER-1);
             }
           else
@@ -1798,7 +1800,7 @@ PointToPointNetDevice::SendLinkStateUpdate ( )
    AddHeaderChannel (packet, 0x800);
    SendChannelSelection (packet, Mac48Address ("ff:ff:ff:ff:ff:ff"), 0x800); // GetBroadcast (), 0x800 are not really used
    
-   Simulator::Schedule (Seconds(100), &PointToPointNetDevice::SendLinkStateUpdate, this);
+   //Simulator::Schedule (Seconds(100), &PointToPointNetDevice::SendLinkStateUpdate, this);
 }
 
 uint16_t
@@ -1823,8 +1825,12 @@ PointToPointNetDevice::LookupRoutingTable (Mac48Address addr)
 void
 PointToPointNetDevice::CreateRoutingTable ()
 {
-    SendLinkStateUpdate ();
-    InitializeTopology ();
+      CalPath = new ShortPath;
+
+    NS_LOG_UNCOND( GetAddress () << " CreateRoutingTable " );
+    //SendLinkStateUpdate ();
+    if (!m_TopoInitialized)
+       {  InitializeTopology ();}
     Mac48Address addr = Mac48Address::ConvertFrom (GetAddress() );
     uint32_t table[V];
     //uint32_t * tablePoint;
@@ -1836,23 +1842,46 @@ PointToPointNetDevice::CreateRoutingTable ()
     uint16_t aid = (aid_h << 8) | (aid_l << 0); 
   
     NS_LOG_DEBUG( "node " << aid );
+    
+    uint32_t numhop = 0;
+   for (uint16_t kk=0; kk < V; kk++) //only for bi
+  {
+      for (uint16_t ii=0; ii < V; ii++)
+      {
+        if (Topology[kk][ii] == 1)
+        {
+            numhop++;
+        }
+              //      NS_LOG_UNCOND (  kk << "\t" << ii << "\t" << Topology[kk][ii] );
+      }  
+  }
+    
+    
+        NS_LOG_UNCOND( GetAddress () << " CreateRoutingTable with hop number " <<   numhop);
+
+  
+
     if (aid-1 < V)
     {
-        tablePoint  = CalPath.dijkstra(Topology, aid - 1);
+        tablePoint  = CalPath->dijkstra(Topology, aid - 1);
         
     for (uint32_t kk=0; kk< V; kk++ )
       {
         if (aid-1 != kk)
-          NS_LOG_UNCOND( "src " << aid-1 <<  ", dest " << kk << ", next hop " <<  *(tablePoint+kk) );
+          NS_LOG_DEBUG( "src " << aid-1 <<  ", dest " << kk << ", next hop " <<  *(tablePoint+kk) );
       } 
     }
+    
+    Simulator::Schedule (Seconds(100), &PointToPointNetDevice::CreateRoutingTable, this);
+
 }
 
 void 
 PointToPointNetDevice::InitializeTopology ()
 {
+    SendLinkStateUpdate ();
   NS_LOG_DEBUG ( " InitializeTopology Topology of  " << GetAddress () );
-
+ m_TopoInitialized = true;
   for (uint16_t kk=0; kk < V; kk++) //only for bi
   {
       for (uint16_t ii=0; ii < V; ii++)
@@ -1861,13 +1890,14 @@ PointToPointNetDevice::InitializeTopology ()
       }   
   }
   
+  uint32_t N = 11;  //temp, only for test
   if (m_channel->IsChannelUni ())
   {
     //uint32_t Nsatellite = 11;  
     uint32_t Nsatellite = 11; // two GES satellite
-    for (uint16_t kk=0; kk < Nsatellite; kk++) //only for uni
+    for (uint16_t kk=0; kk < V; kk++) //only for uni
      {
-      for (uint16_t ii=0; ii < Nsatellite; ii++)
+      for (uint16_t ii=0; ii < V; ii++)
       {
           if (kk == ii)
           {
@@ -1881,7 +1911,8 @@ PointToPointNetDevice::InitializeTopology ()
          else if (kk==N-1 && ii==0)
          {
             Topology[kk][ii] = 1;  
-         } */
+         } 
+           */
       }   
      } 
   }
@@ -1928,8 +1959,9 @@ PointToPointNetDevice::InitializeTopology ()
 void 
 PointToPointNetDevice::UpdateTopologyGES ()
 {
-    
+   /*   
    //for ges
+    
   static uint16_t   count = 1;
   uint16_t distanceToGES0 = 0;
   uint16_t distanceToGES1 = 0;
@@ -1998,14 +2030,141 @@ PointToPointNetDevice::UpdateTopologyGES ()
         Topology[ii][23] = distanceToGES1; 
       }
     }
-  
+    
+   // CreateRoutingTable ();
    Simulator::Schedule (Seconds(100), &PointToPointNetDevice::UpdateTopologyGES, this);
+  */  
+}
+
+
+
+//attached to LEO satellite
+void 
+PointToPointNetDevice::LEOInitLinkDst (uint32_t position, uint32_t InitPosGES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumGES, uint32_t NumLEO, Time interval)
+{
+    
+       //m_indicator = position;
+       m_initPostion = position; // temp, we assume GES and LEO device of LEO satellite have the same position.
+       //m_initPosLES = &InitPosLES; 
+       m_deviceMapPosition = DeviceMapPosition;
+
+       m_NumGES = NumGES;
+       m_NumLEO = NumLEO;
+       m_dstGESinterval = interval;
+       
+       
+       
+        uint32_t sum = 0;
+        uint32_t count = 0;
+        for (uint32_t kk = 0; kk < m_NumGES; kk++)
+            {
+                m_initPosGES[kk] = InitPosGES[kk];
+                //NS_LOG_UNCOND ("position " << position << ", NumGES " << NumGES);
+                //NS_LOG_UNCOND ("kk " << kk << ", m_initPosGES " << m_initPosGES[kk]);
+                sum = sum + m_initPosGES[kk];
+            }
+        
+        while (sum)
+          {
+             count += sum & 1;
+             sum = sum >> 1;
+          }
+        NS_ASSERT (count == m_NumGES);
+         
+        uint32_t pos = 1;
+        for (uint32_t kk = 0; kk < NumLEO; kk++)
+           {
+              m_indicator[kk] = pos;
+              pos <<= 1;
+           }
+        
+     LEOupdateLinkDst ();  
+      
+}
+//position of mine
+void 
+PointToPointNetDevice::LEOupdateLinkDst ()
+{ 
+    
+       //fixed below    
+     for (uint32_t staId = 0; staId < m_NumLEO; staId++)
+     {
+        uint32_t sum = 0;
+        uint32_t ges = 0; //the ges can be linked to
+        bool connected = false;
+        for (uint32_t  kk = 0; kk < m_NumGES; kk++)
+            {
+                //NS_LOG_UNCOND (GetAddress () << "\t" << m_indicator  << " m_initPosGES[kk] "  << m_initPosGES[kk] << ", m_NumLEO " << m_NumLEO);
+                m_linkDst[kk] = m_initPosGES[kk] & m_indicator[staId];
+                sum = sum + m_linkDst[kk] ;
+            }
+          
+           for (uint32_t  kk = 0; kk < m_NumGES; kk++) // initialize, all GES is not connected
+            {
+                Mac48Address  Addr = m_deviceMapPosition.find (kk)->second;
+                uint8_t mac[6];
+                Addr.CopyTo (mac);
+                uint8_t aid_l = mac[5];
+                uint8_t aid_h = mac[4] & 0x1f;
+                uint16_t aidNext1 = (aid_h << 8) | (aid_l << 0); 
+                Topology[staId][aidNext1 - 1] = 9999;   
+            }
+        
+           for (uint32_t  kk = 0; kk < m_NumGES; kk++)
+            {
+                if (m_linkDst[kk] !=0 )
+                 {
+                    connected = true;
+                    break;
+                 }
+                ges++;
+            }
+        
+        //check 
+        uint32_t count = 0;
+        while (sum)
+          {
+             count += sum & 1;
+             sum = sum >> 1;
+          }
+        NS_ASSERT (count == 1 || count == 0);
+        
+       
+        if (connected)
+        {
+          m_dstGESAddr = m_deviceMapPosition.find (ges)->second;
+          NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << ", device id " <<  staId << " LEO-LEOdevice links to GES "  << m_dstGESAddr);
+                uint8_t mac[6];
+                m_dstGESAddr.CopyTo (mac);
+                uint8_t aid_l = mac[5];
+                uint8_t aid_h = mac[4] & 0x1f;
+                uint16_t aidNext1 = (aid_h << 8) | (aid_l << 0); 
+                Topology[staId][aidNext1 - 1] = 1;
+        }
+        else
+        {
+          m_dstGESAddr = Mac48Address ("00:00:00:00:00:00"); //unreachable dst
+          //NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << ", device id " <<  staId << " is not linked to any GES ");
+        }
+        
+                
+        // Circular
+        // example, Assuming that CHAR_BITS == 8, x = ( x << 1U ) | ( x >> 7U ) ; would do a circular bit shift left by one.
+        //m_indicator << 1;
+        uint32_t indicator_a = m_indicator[staId];
+        uint32_t indicator_b = m_indicator[staId];
+        m_indicator[staId] = (indicator_a >> 1) | (indicator_b <<  (m_NumLEO - 1) );
+     }
+        
+    LEOupdateLinkDstEvent =  Simulator::Schedule (m_dstGESinterval, &PointToPointNetDevice::LEOupdateLinkDst, this);
      
 }
+
 
 void 
 PointToPointNetDevice::UpdateTopology (Mac48Address src, Mac48Address nexthop0, Mac48Address nexthop1)
 {
+    
   uint8_t mac[6];
   src.CopyTo (mac);
   uint8_t aid_l = mac[5];
@@ -2032,10 +2191,25 @@ PointToPointNetDevice::UpdateTopology (Mac48Address src, Mac48Address nexthop0, 
     Topology[aidSrc-1][aidNext1-1] = 0; 
   }
   
+  //update the toplogy of my self, the code below can be moved to other funcuton, donot need to alwasy update
+  (Mac48Address::ConvertFrom (GetAddress ()) ).CopyTo (mac );
+   aid_l = mac[5];
+   aid_h = mac[4] & 0x1f;
+  uint16_t aidself = (aid_h << 8) | (aid_l << 0);
   
- // NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " update link state of " << aidSrc-1 << ", nexthop0 " << aidNext-1 << ", nexthop1 " << aidNext1-1 );
+  
+  m_nextHop0.CopyTo (mac );
+   aid_l = mac[5];
+   aid_h = mac[4] & 0x1f;
+  uint16_t aidself_nexthop = (aid_h << 8) | (aid_l << 0);
+   //NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " aidself " << aidself -1 << ", nexthop0 " << m_nextHop0  );
+
+  Topology[aidself-1][aidself_nexthop - 1] = 1;
+  
+  
+ NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " update link state of " << aidSrc-1 << ", nexthop0 " << aidNext-1 << ", nexthop1 " << aidNext1-1 );
  
-  //NS_LOG_UNCOND ( " new Topology of  " << GetAddress () );
+  NS_LOG_UNCOND ( " new Topology of  " << GetAddress () );
   uint16_t numhop = 0;
   for (uint16_t kk=0; kk < V; kk++) //only for bi
   {
@@ -2045,18 +2219,28 @@ PointToPointNetDevice::UpdateTopology (Mac48Address src, Mac48Address nexthop0, 
         {
             numhop++;
         }
-        //NS_LOG_UNCOND (  kk << "\t" << ii << "\t" << Topology[kk][ii] );
+       //NS_LOG_UNCOND (  kk << "\t" << ii << "\t" << Topology[kk][ii] );
       }  
   }
   
-  if (m_channel->IsChannelUni () && numhop == 10)
+   NS_LOG_UNCOND (  GetAddress () << ", m_topologyCompleted " << m_topologyCompleted  << ", numhop " << numhop) ;
+
+  if (m_topologyCompleted && m_channel->IsChannelUni () && numhop != 9)
   {
-              NS_LOG_DEBUG ( " complete Topology of  " << GetAddress () );
+      NS_LOG_UNCOND ("topology unexpectedly changed");
+      //NS_ASSERT_MSG (numhop==9,"topology unexpectedly changed");
+  }
+  if (m_channel->IsChannelUni () && numhop == 9)
+  {
+              m_topologyCompleted = true;
+              NS_LOG_UNCOND ( " complete Topology of  " << GetAddress () << ", m_topologyCompleted " << m_topologyCompleted) ;
   }
   else if (!m_channel->IsChannelUni () && numhop == 20)
   {
         NS_LOG_DEBUG ( " complete Topology of  " << GetAddress () );
   }
+  
+  //CreateRoutingTable ();
 }
 
 Ptr<Queue>
@@ -2674,11 +2858,44 @@ PointToPointNetDevice::Forward (Ptr<Packet> packet, uint16_t counter)
 
    counter++;
    
-  if (m_txMachineState == READY)
-     {
-       TransmitStart (packet);
-     }
+    // if (m_queueMap.find (m_Qos)->second->Enqueue (packet)) 
+   PppHeader ppp;
+   packet->PeekHeader (ppp);
+   bool IsQueued = false;
+   if ( ppp.GetType () == LINKSTATE ) //
+    {
+       IsQueued = m_queueMap.find (3)->second->Enqueue (packet);
+    }
+   else if ( ppp.GetType () == DATATYPE )
+    {
+       IsQueued = m_queueMap.find (ppp.GetQos ())->second->Enqueue (packet);
+    }
+   else
+    {
+       IsQueued = m_queue->Enqueue (packet); //channel selection packets
+    }
+
+         
+    if (IsQueued)
+    {
+      if (m_txMachineState == READY)
+       {
+        //NS_LOG_UNCOND (GetAddress ()  <<  " ready"); 
+         packet = PreparePacketToSend ();
+         TransmitStart (packet);
+       }
+      else
+       {
+            //NS_LOG_UNCOND (GetAddress ()  <<  " not ready ....."); 
+       }
+    }
+    else
+    {
+          //NS_LOG_UNCOND (GetAddress ()  <<  " not Enqueue ..... packet type " << uint32_t (ppp.GetType ()) ); 
+    }
    
+  //NS_LOG_UNCOND (GetAddress ()  <<  " forward packet"); 
+
   m_watingChannelForwardEvent = Simulator::Schedule (Channel_delay_packet, &PointToPointNetDevice::Forward, this, packet, counter);
 }
 
@@ -2898,7 +3115,7 @@ unicast:
     
   m_Qos = ppp.GetQos ();
   NS_LOG_UNCOND ("send data m_Qos " << uint16_t(m_Qos));
-  m_queueMap.find (m_Qos)->second->Enqueue (packet);
+  //m_queueMap.find (m_Qos)->second->Enqueue (packet);
   
   
   
@@ -2909,8 +3126,8 @@ unicast:
   //
   // We should enqueue and dequeue the packet to hit the tracing hooks.
   //
-  //if (m_queueMap.find (m_Qos)->Enqueue (packet)) // ?? what does this mean? todo
-  //  {
+  if (m_queueMap.find (m_Qos)->second->Enqueue (packet)) 
+    {
       //
       // If the channel is ready for transition we send the packet right now
       // 
@@ -2928,7 +3145,11 @@ unicast:
           
         }
       return true; */
-    // }
+     }
+  else
+  {
+        NS_LOG_UNCOND (GetAddress () << " data packet is not queue " );
+  }
 
   // Enqueue may fail (overflow)
   m_macTxDropTrace (packet);

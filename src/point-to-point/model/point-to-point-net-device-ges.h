@@ -508,7 +508,7 @@ private:
     (const Mac48Address addr, const Mac48Address from, const Mac48Address to, const Time ts, const uint32_t rx,
      const uint32_t tx);
   
-  TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t > m_recPacketTrace;
+  TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t,  Mac48Address> m_recPacketTrace;
 
   
   Ptr<PointToPointNetDevice> m_DevSameNode0;

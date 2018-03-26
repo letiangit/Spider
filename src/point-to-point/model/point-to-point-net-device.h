@@ -257,6 +257,9 @@ public:
   
   void UpdateTopologyGES ();
   
+  void LEOInitLinkDst (uint32_t position, uint32_t InitPosGES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumGES, uint32_t NumLEO, Time interval);
+  void LEOupdateLinkDst ();
+  
 
 
 
@@ -676,10 +679,27 @@ private:
     TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t > m_recPacketTrace;
     
     uint32_t Topology[V][V];
-    ShortPath  CalPath;
+    ShortPath  * CalPath;
     uint32_t * tablePoint;
     uint8_t m_Qos;
     bool m_GESSameNodeFlag;
+    
+    
+  uint32_t m_indicator[V];
+  uint32_t m_initPostion;
+  uint32_t m_initPosGES[9999];
+  uint32_t m_linkDst[9999];
+  std::map<uint32_t, Mac48Address>  m_deviceMapPosition;
+  uint32_t m_NumGES;
+  uint32_t m_NumLEO;
+  Time m_dstGESinterval;
+  Mac48Address m_dstGESAddr;
+  bool m_topologyCompleted;
+  bool m_TopoInitialized;
+  
+  EventId LEOupdateLinkDstEvent;
+
+  
     
     
 

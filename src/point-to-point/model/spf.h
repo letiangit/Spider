@@ -26,9 +26,11 @@ public:
 
     ShortPath ();
     uint32_t minDistance(uint32_t dist[], bool sptSet[]);
-    uint32_t *   printSolution(uint32_t dist[], uint32_t preNode[], uint32_t n);
+    uint32_t *   printSolution(uint32_t dist[], uint32_t preNode[V], uint32_t n);
     uint32_t *  dijkstra(uint32_t graph[V][V], uint32_t src);
     uint32_t RoutingTable[V];
+    uint32_t SearchPath(uint32_t prev[],uint32_t src, uint32_t v); // v: src, u dst
+
 
 };
 }
