@@ -44,6 +44,10 @@
 
 using namespace std;
 namespace ns3 {
+    
+struct WifiRemoteStationState;
+struct WifiRemoteStation;
+
 
 NS_LOG_COMPONENT_DEFINE ("PointToPointNetDevice");
 
@@ -226,6 +230,11 @@ PointToPointNetDevice::GetTypeId (void)
                     "The header of successfully transmitted packet",
                     MakeTraceSourceAccessor (&PointToPointNetDevice::m_recPacketTrace),
                     "ns3::PointToPointNetDevice::RecPacketCallback")
+    .AddTraceSource ("ARQRecPacketTrace",
+                    "Channel has been successfully Selected"
+                    "The header of successfully transmitted packet",
+                    MakeTraceSourceAccessor (&PointToPointNetDevice::m_ARQrecPacketTrace),
+                    "ns3::PointToPointNetDevice::ARQRecPacketCallback")
   ;
   return tid;
 }
@@ -255,6 +264,7 @@ PointToPointNetDevice::PointToPointNetDevice ()
     m_nextHop1(Mac48Address::ConvertFrom (GetBroadcast() )),
     m_topologyCompleted (false),
     m_TopoInitialized (false),
+    ARQAckTimer (Seconds(10)),
     m_currentPkt (0)
 {
   NS_LOG_FUNCTION (this);
@@ -340,7 +350,7 @@ PointToPointNetDevice::AddHeader (Ptr<Packet> p, uint16_t protocolNumber)
   NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress () << " add header to " << m_destAddress);
 
   
-  if (m_type == CHANNELACK) 
+  if (m_type == CHANNELACK || m_type == DATAACK || m_type == N_ACK) 
    {
         ppp.SetID (m_ackid);
    }
@@ -544,8 +554,8 @@ PointToPointNetDevice::TransmitComplete (void)
   m_phyTxEndTrace (m_currentPkt);
   m_currentPkt = 0;
 
-  Ptr<Packet> p = m_queue->Dequeue ();
-  //Ptr<Packet> p = PreparePacketToSend ();
+  //Ptr<Packet> p = m_queue->Dequeue (); 
+  Ptr<Packet> p = PreparePacketToSend ();
   if (p == 0)
     {
       //
@@ -866,7 +876,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
             NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " update link state of " << ppp.GetSourceAddre () << ", nexthop0 " << ppp.GetNextHop0 () << ", nexthop1 " << ppp.GetNextHop1 ());
             UpdateTopology (ppp.GetSourceAddre (), ppp.GetNextHop0 (), ppp.GetNextHop1 ());
         }
-       else if (ppp.GetType () == DATATYPE)
+       else if (ppp.GetType () == DATATYPE || ppp.GetType () == DATAACK || ppp.GetType () == N_ACK)
         {
            NS_LOG_DEBUG ("receive data packet");
            Receive (packet);
@@ -960,7 +970,7 @@ PointToPointNetDevice::ReceiveChannel (Ptr<Packet> packet, uint32_t linkchannel)
             NS_LOG_DEBUG (Simulator::Now() << "\t" << GetAddress () << " update link state of " << ppp.GetSourceAddre () << ", nexthop0 " << ppp.GetNextHop0 ());
             UpdateTopology (ppp.GetSourceAddre (), ppp.GetNextHop0 (), ppp.GetNextHop1 ());
         }
-      else if (ppp.GetType () == DATATYPE)
+      else if (ppp.GetType () == DATATYPE || ppp.GetType () == DATAACK || ppp.GetType () == N_ACK)
         {
            NS_LOG_DEBUG ("receive data packet");
            Receive (packet);
@@ -1362,15 +1372,31 @@ PointToPointNetDevice::Receive (Ptr<Packet> packet)
         }
 
       m_macRxTrace (originalPacket);
-      if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ) || ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff"))
+     if (ppp.GetType () == DATATYPE )
+     {
+      if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ) || ppp.GetDestAddre () == Mac48Address ("ff:ff:ff:ff:ff:ff") )
       {
+        Ptr<Packet> ARQRxPacket = packet->Copy ();
        //NS_LOG_UNCOND(Simulator::Now() << "\t"  << GetAddress () << " receives packet from "  <<ppp.GetSourceAddre() << " to " << ppp.GetDestAddre ()  << ", size "  <<  packet->GetSize() << ",  protocol " << protocol );
        m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+       
+       ARQReceive (ppp.GetSourceAddre(), ppp.GetSourceAddre(), Simulator::Now (), packet->GetSize() ,  protocol, ppp.GetID (), ARQRxPacket);
+
        m_rxCallback (this, packet, protocol, GetRemote ());
        Ptr<Packet> SpiderPacket = packet->Copy ();
        //m_spiderrxCallback (this, SpiderPacket, protocol, GetRemote ());
 
       } // Should the two condition be separated? if the packet is for me, there should be no forward
+     }
+     else if (ppp.GetType () == DATAACK )
+     {
+         ARQACKRecevie (ppp.GetSourceAddre(), ppp.GetID ());  
+     }
+     else if ( ppp.GetType () == N_ACK )
+     {
+         ARQN_ACKRecevie (ppp.GetSourceAddre(), ppp.GetID ());   
+     }
+      
       
       if (ppp.GetDestAddre () == Mac48Address::ConvertFrom (GetAddress() ))
       {
@@ -2862,7 +2888,7 @@ PointToPointNetDevice::Forward (Ptr<Packet> packet, uint16_t counter)
    PppHeader ppp;
    packet->PeekHeader (ppp);
    bool IsQueued = false;
-   if ( ppp.GetType () == LINKSTATE ) //
+   if ( ppp.GetType () == LINKSTATE || ppp.GetType () == DATAACK || ppp.GetType () == N_ACK) //
     {
        IsQueued = m_queueMap.find (3)->second->Enqueue (packet);
     }
@@ -2912,7 +2938,7 @@ PointToPointNetDevice::SendChannelSelection (
   
   NS_LOG_DEBUG (Simulator::Now() <<" \t " << GetAddress () << ", send to " << dest);
   
-  if (m_type ==  DATATYPE )
+  if (m_type ==  DATATYPE || m_type == DATAACK || m_type == N_ACK)
   {
       NS_LOG_DEBUG (Simulator::Now() <<" drop data packet, " << GetAddress () << ", incorrect data type " );
       return false;  
@@ -3156,26 +3182,90 @@ unicast:
   return false;
 }
 
+
 Ptr<Packet>
 PointToPointNetDevice::PreparePacketToSend ()
 {
   Ptr<Packet> packet;  
+  Ptr<Packet> packetSend;  
   
   packet = m_queue->Dequeue ();
   if (packet != 0)
   {
       return packet;
   }
+  
 
+  //add packets to the buffer if there is room
+  Ptr<const Packet>  packetkPeek;
+  bool queueEmpyt = true;
+  for (uint8_t qos = 4; qos > 0; qos--)
+   {
+      packetkPeek = m_queueMap.find (qos-1)->second->Peek ();
+      if (packetkPeek != 0)
+       {    
+            queueEmpyt = false;
+            PppHeader ppp;
+            packetkPeek->PeekHeader (ppp);
+            RemoteSatelliteTx * Satellite = ARQLookupTx ( ppp.GetDestAddre (), ppp.GetID () );
+            RemoteSatelliteARQBufferTx * buffer  = Satellite->m_buffer;
+            if (buffer->m_bufferSize == buffer->m_listPacket->size ()  )
+             {
+               NS_LOG_UNCOND ("ARQ is full, packets are not dequeued"); 
+               packet = ARQSend (buffer);
+             }
+            else 
+             {
+                NS_LOG_UNCOND ("ARQ is not full, packets are not dequeued"); 
+               NS_ASSERT(buffer->m_bufferSize > buffer->m_listPacket->size ());
+               packetSend = m_queueMap.find (qos-1)->second->Dequeue (); 
+               packet = ARQSend (buffer, packetSend);               
+             }
+            NS_ASSERT (packet != 0);
+
+            return  packet;
+        }
+    } //put packet to the buffer
+           
+  
+  
+  
+  if (queueEmpyt)
+   {
+    //scan all the remote staellite
+    for (StatDeviceTx::const_iterator i = m_statDeviceTx.begin (); i != m_statDeviceTx.end (); i++)
+      {
+        RemoteSatelliteARQBufferTx * buffer  = (*i)->m_buffer;
+        packet = ARQSend (buffer);
+        if (packet != 0)
+        {
+            return packet;
+        }
+     } 
+   }
+  
+  return 0;
     
+    
+  
+  
+
+
+   /*
   for (uint8_t qos = 4; qos > 0; qos--)
    {
        NS_LOG_UNCOND ("PointToPointNetDevice m_Qos " << uint16_t (qos-1) << ", size " << m_queueMap.find (qos-1)->second->GetNPackets ()); 
        packet =  m_queueMap.find (qos-1)->second->Dequeue ();
        if (packet != 0)
-            break;
-   }
-  return packet;
+         {
+            return packet;
+            //break;
+         }
+   } 
+  
+   */
+ 
+  
 }
 
 
@@ -3317,6 +3407,693 @@ PointToPointNetDevice::AddGESDevice (Ptr<PointToPointNetDeviceGES> deva)
   m_GESSameNodeFlag = true;
   m_GESSameNode = deva;
   NS_LOG_UNCOND (GetAddress () << " has GESDEVICE " << m_GESSameNode->GetAddress() );
+}
+
+
+
+void
+PointToPointNetDevice::CheckAvailablePacket (RemoteSatelliteARQBuffer * buffer, Mac48Address src)
+{
+    NS_ASSERT (buffer->m_listPacket->size () < buffer->m_bufferSize);
+    ARQRxBufferCheck (buffer);
+    
+    std::list<uint32_t >::const_iterator i = buffer->m_listPacketId->begin ();
+    
+    
+    if ( buffer->m_bufferStart == (*i) )
+    {
+       Ptr<Packet> packet =  buffer->m_listPacket->front ();
+       Time rxtime =  buffer->m_listRecTime->front ();
+       uint32_t size  =   buffer->m_listSize->front ();
+       uint32_t protocol = buffer->m_listProtocol->front ();
+       uint32_t packetid = buffer->m_listPacketId->front ();
+       //deliver to upper layer 
+        m_ARQrecPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), src , packet, rxtime, size, protocol,  packetid);
+        
+        buffer->m_listPacket->pop_front ();
+        buffer->m_listRecTime->pop_front ();
+        buffer->m_listSize->pop_front ();
+        buffer->m_listProtocol->pop_front ();
+        buffer->m_listPacketId->pop_front ();
+        
+        buffer->m_bufferStart++;
+        
+
+        Simulator::ScheduleNow (&PointToPointNetDevice::CheckAvailablePacket, this, buffer, src);
+    }
+    else 
+    {
+        NS_ASSERT ( buffer->m_bufferStart < (*i) );
+    }
+    
+}
+
+
+//m_recPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetSourceAddre(), ppp.GetDestAddre (), Simulator::Now (), packet->GetSize() , protocol);
+void
+PointToPointNetDevice::ARQReceive (Mac48Address src, Mac48Address dst, Time rxtime, uint32_t size , uint32_t protocol, uint32_t packetid, Ptr<Packet> packet)
+{
+    NS_ASSERT (Mac48Address::ConvertFrom(GetAddress ()) == dst);
+    RemoteSatellite * Satellite = ARQLookup ( src,  rxtime,  size ,  protocol,  packetid);
+    RemoteSatelliteARQBuffer * buffer = Satellite->m_buffer;
+    
+    ARQRxBufferCheck (buffer);
+    
+    NS_ASSERT (buffer->m_listPacket->size () < buffer->m_bufferSize);
+            
+    std::list<Time >::const_iterator RxTimeiterator = buffer->m_listRecTime->begin ();
+    std::list<uint32_t >::const_iterator Sizeiterator = buffer->m_listSize->begin ();
+    std::list<uint32_t >::const_iterator Protocoliterator = buffer->m_listProtocol->begin ();
+    std::list<Ptr<Packet> >::const_iterator Packetiterator = buffer->m_listPacket->begin ();
+  
+    bool packetBuffered = false;   
+    uint32_t start = buffer->m_bufferStart;
+    if (packetid < start)
+      {
+         // drop the packet
+        //send ack 
+        SendAck (packet, src, protocol,  packetid, DATAACK);
+        return;
+      }
+    else if (packetid > start  || packetid < start + buffer->m_bufferSize)
+      {
+        //send ack 
+        SendAck (packet, src, protocol,  packetid, DATAACK);
+        goto bufferpacket; //buffer the packet 
+      } 
+    else if (packetid > start + buffer->m_bufferSize || packetid == start + buffer->m_bufferSize)
+     {
+        //drop
+        goto preTopacketid;
+     }
+   else if (packetid == start)
+      {
+        //deliver to upper layer
+        m_ARQrecPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), src , packet, rxtime, size, protocol,  packetid);
+        SendAck (packet, src, protocol,  packetid, DATAACK);
+        start++;
+        buffer->m_bufferStart++;
+        //check the next packet
+        CheckAvailablePacket (buffer, src);
+        return;
+      }
+  
+   
+
+
+  bufferpacket:
+    
+    if ( buffer->m_listPacket->empty())
+      {
+        buffer->m_listPacket->push_back (packet);
+        buffer->m_listRecTime->push_back (rxtime);
+        buffer->m_listSize->push_back (size);
+        buffer->m_listProtocol->push_back (protocol);
+        buffer->m_listPacketId->push_back (packetid);
+      }
+    else
+     {        
+        for (std::list<uint32_t >::const_iterator i = buffer->m_listPacketId->begin (); i != buffer->m_listPacketId->end (); i++)
+         {
+           //  (packetid > start  || packetid < start + buffer->m_bufferSize)
+           if (packetid <(*i) )
+              {
+                buffer->m_listPacketId->insert (i,packetid);  
+                buffer->m_listRecTime->insert (RxTimeiterator,rxtime);
+                buffer->m_listSize->insert (Sizeiterator,size);
+                buffer->m_listProtocol->insert (Protocoliterator,protocol);
+                buffer->m_listPacket->insert (Packetiterator,packet);
+                    
+                packetBuffered = true;
+                break;
+              }
+            RxTimeiterator++;
+            Sizeiterator++;
+            Protocoliterator++;
+            Packetiterator++;
+         }
+     }
+   
+  if (! packetBuffered)
+   {
+     buffer->m_listPacket->push_back (packet);
+     buffer->m_listRecTime->push_back (rxtime);
+     buffer->m_listSize->push_back (size);
+     buffer->m_listProtocol->push_back (protocol);
+     buffer->m_listPacketId->push_back (packetid);
+   }
+  
+  
+  
+ preTopacketid: 
+   buffer->m_NACKNumStart++; // start packet is sent
+  if (buffer->m_NACKNumStart > NACKNUMSTART)
+   {
+      buffer->m_bufferStart++;
+      CheckAvailablePacket (buffer, src);
+   }
+   start = buffer->m_bufferStart; 
+   
+   for (uint32_t M = start; M < packetid; M++)
+    {
+        //If M is marked as not received: send a NACK with ID = M
+        //check all the packet [M, packetid), if not received, send NACK with M
+         for (std::list<uint32_t >::const_iterator i = buffer->m_listPacketId->begin (); i != buffer->m_listPacketId->end (); i++)
+            // (uint32_t M = start; M < packetid; M++)   
+            {
+               if (M  ==(*i) )
+                 {
+                   break;
+                 } 
+            }
+            SendAck (packet, src, protocol,  M, N_ACK);
+           //send NACK with M
+    }
+  
+}
+
+RemoteSatellite * 
+PointToPointNetDevice::ARQLookup (Mac48Address src, Time rece, uint32_t size , uint32_t protocol, uint32_t packetid)  const
+{ 
+   for (StatDevice::const_iterator i = m_statDevice.begin (); i != m_statDevice.end (); i++)
+    {
+      if ((*i)->m_remoteAddress == src)
+        {
+          return (*i);
+        }
+    } 
+   
+  // create state RemoteSatelliteARQBuffer
+  RemoteSatelliteARQBuffer * buffer = new RemoteSatelliteARQBuffer ();
+  
+  std::list<Ptr<Packet> > * listPacket = new std::list<Ptr<Packet> >;
+  std::list<Time > * listRecTime = new std::list<Time >;
+  std::list<uint32_t > * listSize = new std::list<uint32_t >;
+  std::list<uint32_t > * listProtocol = new std::list<uint32_t >;
+  std::list<uint32_t > * listPacketId = new std::list<uint32_t >;
+
+  buffer->m_listPacket = listPacket;
+  buffer->m_listRecTime = listRecTime;
+  buffer->m_listSize = listSize;
+  buffer->m_listProtocol = listProtocol; 
+  buffer->m_listPacketId = listPacketId; 
+  
+  buffer->m_bufferStart = 0;
+  buffer->m_bufferSize = BUFFERSIZE;
+  buffer->m_NACKNumStart = 0;
+  
+  //create new RemoteSatellite
+  RemoteSatellite *Satellite = new RemoteSatellite ();
+  Satellite->m_buffer = buffer;
+  Satellite->m_retryCount = ARQCOUNT;   //not needed
+  Satellite->m_remoteAddress = src;
+  
+  const_cast<PointToPointNetDevice *> (this)->m_statDevice.push_back (Satellite);
+  
+  ARQRxBufferCheck (buffer);
+  
+  return Satellite;
+}
+
+            
+            
+
+
+
+bool
+PointToPointNetDevice::ARQRxBufferCheck (RemoteSatelliteARQBuffer * buffer) const
+{
+    uint32_t size = buffer->m_listPacket->size ();
+    NS_ASSERT (buffer->m_listRecTime->size () == size);
+    NS_ASSERT (buffer->m_listSize->size () == size);
+    NS_ASSERT (buffer->m_listProtocol->size () == size);
+    NS_ASSERT (buffer->m_listPacketId->size () == size);
+    return true;
+}
+
+
+bool
+PointToPointNetDevice::ARQTxBufferCheck (RemoteSatelliteARQBufferTx * buffer) const
+{
+    uint32_t size = buffer->m_listPacket->size ();
+    NS_ASSERT (buffer->m_listTxTime->size () == size);
+    NS_ASSERT (buffer->m_listPacketId->size () == size);
+    NS_ASSERT (buffer->m_listPacketStatus->size () == size);
+    NS_ASSERT (buffer->m_listPacketRetryNum->size () == size);
+    return true;
+}
+
+
+ 
+
+void
+PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint32_t packetid)
+{
+    ARQTxBufferCheck (buffer);
+    bool packetInbuffer = false;
+    /*
+    if ( ARQAckTimeoutEvent.IsRunning () )
+      {
+        ARQAckTimeoutEvent.Cancel (); // ARQAckTimeoutEvent can be overwritten, maybe not use
+      } 
+     */
+    
+    std::list<uint32_t >::const_iterator PacketStatusiterator = buffer->m_listPacketStatus->begin ();
+    std::list<uint32_t >::const_iterator PacketRetryNumiterator = buffer->m_listPacketRetryNum->begin ();
+
+    for (std::list<uint32_t >::const_iterator it = buffer->m_listPacketId->begin (); it != buffer->m_listPacketId->end (); it++)
+     {
+        if ( (*it) == packetid &&  (*PacketStatusiterator) == TRANSMITTED && (*PacketRetryNumiterator) == ARQCOUNT )
+        {
+            NS_ASSERT ( packetid == buffer->m_bufferStart); // assume this packet should be at front of the window. to do
+            NS_ASSERT ( it == buffer->m_listPacketId->begin ()); // assume this packet should be at front of the window. to do
+            
+            buffer->m_listPacket->pop_front ();
+            buffer->m_listTxTime->pop_front ();
+            buffer->m_listPacketId->pop_front ( );
+            buffer->m_listPacketStatus->pop_front ();
+            buffer->m_listPacketRetryNum->pop_front ();
+            buffer->m_bufferStart++;
+            //packetInbuffer = true;
+            break;
+        }
+        else if ( (*it) == packetid &&  (*PacketStatusiterator) == TRANSMITTED )
+        {
+            //NS_ASSERT ( (*PacketStatusiterator) == TRANSMITTED);
+            PacketStatusiterator = buffer->m_listPacketStatus->erase (PacketStatusiterator);
+            buffer->m_listPacketStatus->insert (PacketStatusiterator, NO_TRANSMITTED);
+            //packetInbuffer = true;
+            break;
+        }
+        PacketStatusiterator++;
+        PacketRetryNumiterator++;
+     }
+
+    //NS_ASSERT (packetInbuffer);          
+}
+
+
+void
+PointToPointNetDevice::ARQN_ACKRecevie (Mac48Address dst, uint32_t packetid) 
+{
+    RemoteSatelliteTx * Satellite = ARQLookupTx (dst, packetid); 
+    RemoteSatelliteARQBufferTx * buffer = Satellite->m_buffer;
+    
+    ARQTxBufferCheck (buffer);
+
+    ARQAckTimeout (buffer, packetid);
+}
+       
+  
+  
+void
+PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)  
+{
+    RemoteSatelliteTx * Satellite = ARQLookupTx (dst, packetid); 
+    RemoteSatelliteARQBufferTx * buffer = Satellite->m_buffer;
+    
+    ARQTxBufferCheck (buffer);
+    
+    NS_ASSERT (buffer->m_listPacketId->front () == buffer->m_bufferStart);
+    if (buffer->m_listPacketId->front () == packetid && buffer->m_listPacketStatus->front () == TRANSMITTED)
+      {
+         buffer->m_listPacket->pop_front ();
+         buffer->m_listTxTime->pop_front ();
+         buffer->m_listPacketId->pop_front ( );
+         buffer->m_listPacketStatus->pop_front ();
+         buffer->m_listPacketRetryNum->pop_front ();
+         buffer->m_bufferStart++;
+         
+         Ptr<const Packet>  packetkPeek;
+         Ptr<Packet>  packetSend;
+         Ptr<Packet>  packet;
+         for (uint8_t qos = 4; qos > 0; qos--)
+           {
+             packetkPeek = m_queueMap.find (qos-1)->second->Peek ();
+      
+             if (packetkPeek != 0)
+              {    
+                PppHeader ppp;
+                packetkPeek->PeekHeader (ppp);
+                if (dst == ppp.GetDestAddre () )
+                  {
+                    NS_ASSERT(buffer->m_bufferSize > buffer->m_listPacket->size ());
+                    packetSend = m_queueMap.find (qos-1)->second->Dequeue (); 
+                    packet = ARQSend (buffer, packetSend); 
+                    NS_ASSERT (packet != 0);
+                  }     
+             }
+           } // is this necessary? packet will be buffer anyway when queue is not empty. to do
+         return;
+      }
+    
+    std::list<uint32_t >::const_iterator PacketStatusiterator = buffer->m_listPacketStatus->begin ();
+    std::list<Ptr<Packet> >::const_iterator Packetiterator = buffer->m_listPacket->begin ();
+    std::list<Time >::const_iterator TxTimeiterator = buffer->m_listTxTime->begin ();
+    std::list<uint32_t >::const_iterator PacketRetryNumiterator = buffer->m_listPacketRetryNum->begin ();
+    
+    for (std::list<uint32_t >::const_iterator it = buffer->m_listPacketId->begin (); it != buffer->m_listPacketId->end (); it++)
+    {
+        if ( (*it) == packetid &&  (*PacketStatusiterator) == TRANSMITTED )
+         {
+            PacketStatusiterator = buffer->m_listPacketStatus->erase (PacketStatusiterator);
+            buffer->m_listPacketStatus->insert (PacketStatusiterator, ACK_REC);
+            break; 
+         }
+        PacketStatusiterator++;
+        Packetiterator++;
+        TxTimeiterator++;
+    }
+
+
+    
+}
+
+
+Ptr<Packet> 
+PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer)  
+{   
+    if (buffer->m_listPacket->size () == 0)
+      {
+         return 0;
+      }
+    
+    Ptr<Packet> packet;
+    
+    std::list<Ptr<Packet> >::const_iterator Packetiterator = buffer->m_listPacket->begin ();
+    std::list<Time >::const_iterator TxTimeiterator = buffer->m_listTxTime->begin ();
+    std::list<uint32_t >::const_iterator PacketIditerator = buffer->m_listPacketId->begin ();
+    std::list<uint32_t >::const_iterator PacketRetryNumiterator = buffer->m_listPacketRetryNum->begin ();
+
+    ARQTxBufferCheck (buffer);
+
+
+    
+    uint32_t retry_num = 0;        
+    for (std::list<uint32_t >::const_iterator it = buffer->m_listPacketStatus->begin (); it != buffer->m_listPacketStatus->end (); it++)
+    {
+        if ((*it) == NO_TRANSMITTED )
+        {
+
+            packet =  (*Packetiterator);
+
+            TxTimeiterator = buffer->m_listTxTime->erase (TxTimeiterator);
+
+            buffer->m_listTxTime->insert (TxTimeiterator, Simulator::Now ());
+            
+            it = buffer->m_listPacketStatus->erase (it);
+            buffer->m_listPacketStatus->insert (it, TRANSMITTED);
+            retry_num = (* PacketRetryNumiterator);
+            PacketRetryNumiterator = buffer->m_listPacketRetryNum->erase (PacketRetryNumiterator);
+            buffer->m_listPacketRetryNum->insert (PacketRetryNumiterator, retry_num++);
+            
+
+            
+            ARQAckTimeoutEvent = Simulator::Schedule(ARQAckTimer, &PointToPointNetDevice::ARQAckTimeout, this, buffer, *PacketIditerator );
+            return packet;
+        }
+        
+        Packetiterator++;
+        TxTimeiterator++;
+        PacketIditerator++;
+        PacketRetryNumiterator++;
+    }
+    
+
+    return 0;
+}
+
+Ptr<Packet> 
+PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Packet> packet)
+{
+    NS_ASSERT (buffer->m_listPacket->size () < buffer->m_bufferSize );
+    ARQTxBufferCheck (buffer);
+    
+    PppHeader ppp;
+    packet->PeekHeader (ppp);
+    Time txTime = Seconds (0);
+    
+    buffer->m_listPacket->push_back (packet);
+    buffer->m_listTxTime->push_back (txTime);
+    buffer->m_listPacketId->push_back (ppp.GetID () );
+    buffer->m_listPacketStatus->push_back (NO_TRANSMITTED);
+    buffer->m_listPacketRetryNum->push_back (0);
+    
+    NS_LOG_UNCOND ("PointToPointNetDevice::ARQSend  ");
+    
+    return ARQSend (buffer); 
+}
+
+
+RemoteSatelliteTx * 
+PointToPointNetDevice::ARQLookupTx (Mac48Address dst, uint32_t packetid)  const
+{ 
+   for (StatDeviceTx::const_iterator i = m_statDeviceTx.begin (); i != m_statDeviceTx.end (); i++)
+    {
+      if ((*i)->m_remoteAddress == dst)
+        {
+          return (*i);
+        }
+    } 
+   //first received packet start the window 
+   
+  // create state RemoteSatelliteARQBuffer
+  RemoteSatelliteARQBufferTx * buffer = new RemoteSatelliteARQBufferTx ();
+  
+  std::list<Ptr<Packet> > * listPacket = new std::list<Ptr<Packet> >;
+  std::list<Time > * listTxTime = new std::list<Time >;
+  std::list<uint32_t > * listPacketId = new std::list<uint32_t >;
+  std::list<uint32_t > * listPacketStatus = new std::list<uint32_t >;
+  std::list<uint32_t > * listPacketRetryNum = new std::list<uint32_t >;
+
+  buffer->m_listPacket = listPacket;
+  buffer->m_listTxTime = listTxTime;
+  buffer->m_listPacketId = listPacketId; 
+  buffer->m_listPacketStatus = listPacketStatus; 
+  buffer->m_listPacketRetryNum = listPacketRetryNum; 
+  
+  buffer->m_bufferStart = packetid;
+  buffer->m_bufferSize = BUFFERSIZE;
+  
+  //create new RemoteSatellite
+  RemoteSatelliteTx *Satellite = new RemoteSatelliteTx ();
+  Satellite->m_buffer = buffer;
+  Satellite->m_retryCount = ARQCOUNT;   //not needed
+  Satellite->m_remoteAddress = dst;
+  
+  //const_cast<PointToPointNetDevice *> (this)->m_statDeviceTx.push_back (Satellite);
+  
+    ARQTxBufferCheck (buffer);
+  
+  return Satellite;
+}
+
+
+
+bool
+PointToPointNetDevice::SendAck (
+  Ptr<Packet> packet, 
+  const Address &dest, 
+  uint16_t protocolNumber, uint32_t packetid, uint32_t acktype)
+{
+  NS_LOG_FUNCTION (this << packet << dest << protocolNumber);
+  NS_LOG_LOGIC ("p=" << packet << ", dest=" << &dest);
+  NS_LOG_LOGIC ("UID is " << packet->GetUid ());
+  
+  NS_ASSERT (acktype == DATAACK || acktype == N_ACK);
+  
+  
+  if ( m_state != EXTERNAL_REC_CHANNEL_ACK && m_state != INTERNAL_SEND_CHANNEL_ACK && m_state != EXTERNAL_SEND_CHANNEL_ACK )
+  {
+      NS_LOG_UNCOND (Simulator::Now() <<" drop ack packet, " << GetAddress () << ", since channel is not selected "  );
+      return false;  
+  }
+  m_destAddress = Mac48Address::ConvertFrom (dest);
+  LlcSnapHeader llc_test;
+  if (packet->PeekHeader (llc_test))
+  {
+                  NS_LOG_DEBUG( "llc_test.GetType " << llc_test.GetType () );
+            NS_LOG_DEBUG("Found a LLC looking header of " );
+            //llc_test.Print (std::cout);
+                             NS_LOG_DEBUG(  ", llc_test.GetType " << llc_test.GetType () );
+
+        if (llc_test.GetType () == 2054)
+        {
+
+          NS_LOG_UNCOND(GetAddress ()  << "  Found an ARP packet!,  size " << packet->GetSize());
+        }
+  }
+  
+    NS_LOG_UNCOND (Simulator::Now() <<" \t " << GetAddress () << ", send ack packet to " << dest << ", size " << packet->GetSize() << ", protocolNumber " << protocolNumber );
+
+ 
+  if  (dest == GetBroadcast () )
+     {
+        m_destAddress =  Mac48Address::ConvertFrom (GetBroadcast() );
+    }
+  
+          
+  if (!m_channel->IsChannelUni ())
+  {
+       uint16_t nextHop = LookupRoutingTable (Mac48Address::ConvertFrom(dest));
+
+       NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << "\t my address:" << GetAddress()  <<  " --route to " << nextHop << ", ack packet " << packet->GetSize() <<
+               ", protocolNumber " << protocolNumber);
+       m_destAddress = Mac48Address::ConvertFrom(dest);
+       m_type =  acktype;
+       
+       Mac48Address addr = Mac48Address::ConvertFrom(m_DevSameNode->GetAddress ());
+       uint8_t mac[6];
+       addr.CopyTo (mac);
+       uint8_t aid_l = mac[5];
+       uint8_t aid_h = mac[4] & 0x1f;
+       uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+           
+       if (nextHop == aid - 1 )
+       {
+           NS_LOG_UNCOND(dest << "\t" << GetAddress()  <<  " route to  inside" );
+           return m_DevSameNode->SendFromInside (packet, dest, protocolNumber, true);
+       }
+       else
+       {
+           // it will send to the other end of point to point channel
+
+       }
+  }
+  else
+  {
+      NS_LOG_UNCOND ("uni directional" );
+
+       uint16_t nextHop = LookupRoutingTable (Mac48Address::ConvertFrom(dest));
+
+       NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << "\t my address:" << GetAddress()  <<  " --route to ack " << nextHop << ", packet " << packet->GetSize() <<
+               ", protocolNumber " << protocolNumber);
+       m_destAddress = Mac48Address::ConvertFrom(dest);
+       m_type =  acktype;
+       
+       uint8_t mac[6];
+       m_nextHop0.CopyTo (mac);
+       uint8_t aid_l = mac[5];
+       uint8_t aid_h = mac[4] & 0x1f;
+       uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+        
+          if (m_destAddress == Mac48Address ("ff:ff:ff:ff:ff:ff")  )  
+            {
+                Ptr<Packet> CopyPacket = packet->Copy ();
+                AddHeader (CopyPacket, protocolNumber);
+
+                //m_GESSameNode->Send (CopyPacket, dest, protocolNumber);
+                m_GESSameNode->Forward (CopyPacket);
+                goto unicast;
+            }
+          else if (aid !=  nextHop )
+            {
+                NS_LOG_UNCOND ("m_GESSameNode->Send (packet, dest, protocolNumber)");
+               //return m_GESSameNode->Send (packet, dest, protocolNumber);
+                Ptr<Packet> CopyPacket = packet->Copy ();
+                AddHeader (CopyPacket, protocolNumber);
+                //m_GESSameNode->Send (CopyPacket, dest, protocolNumber);
+                m_GESSameNode->Forward (CopyPacket);
+                goto unicast;
+            }
+         else
+            {
+                NS_LOG_UNCOND ("send through  p2p channel" );
+                Ptr<Packet> CopyPacket = packet->Copy ();
+                AddHeader (CopyPacket, protocolNumber);
+                m_GESSameNode->Send (CopyPacket, dest, protocolNumber);
+                m_GESSameNode->Forward (CopyPacket);
+                goto unicast;
+            }
+      
+  }
+unicast:
+  m_type =  acktype;
+  
+
+  
+
+
+  
+  //
+  // If IsLinkUp() is false it means there is no channel to send any packet 
+  // over so we just hit the drop trace on the packet and return an error.
+  //
+  if (IsLinkUp () == false)
+    {
+      m_macTxDropTrace (packet);
+      return false;
+    }
+
+  //
+  // Stick a point to point protocol header on the packet in preparation for
+  // shoving it out the door.
+  //
+  //m_Qos = m_rng->GetInteger (0, 3);
+  m_Qos = 3;
+  NS_LOG_UNCOND ("set ack m_Qos " << uint16_t(m_Qos));
+  
+  m_ackid = packetid;
+  AddHeader (packet, protocolNumber);
+
+  m_macTxTrace (packet);
+  
+   PppHeader ppp;
+   packet->PeekHeader (ppp);
+    
+  m_Qos = ppp.GetQos ();
+  NS_LOG_UNCOND ("send ack m_Qos " << uint16_t(m_Qos));
+  //m_queueMap.find (m_Qos)->second->Enqueue (packet);
+  
+  
+  
+
+
+  
+
+  //
+  // We should enqueue and dequeue the packet to hit the tracing hooks.
+  //
+  if (m_queueMap.find (m_Qos)->second->Enqueue (packet)) 
+    {
+      //
+      // If the channel is ready for transition we send the packet right now
+      // 
+      if (m_txMachineState == READY)
+        {
+          packet = PreparePacketToSend ();
+          m_snifferTrace (packet);
+          m_promiscSnifferTrace (packet);
+          return TransmitStart (packet);
+        }
+     /* else if (m_txMachineState == BUSY)
+        {
+          // wait until READY
+          //then send
+          
+        }
+      return true; */
+     }
+  else
+  {
+        NS_LOG_UNCOND (GetAddress () << " ack packet is not queue " );
+  }
+
+  // Enqueue may fail (overflow)
+  m_macTxDropTrace (packet);
+  return false;
+}
+
+
+
+RemoteSatellite::~RemoteSatellite ()
+{
+  NS_LOG_FUNCTION (this);
+}
+
+RemoteSatelliteTx::~RemoteSatelliteTx ()
+{
+  NS_LOG_FUNCTION (this);
 }
 
 

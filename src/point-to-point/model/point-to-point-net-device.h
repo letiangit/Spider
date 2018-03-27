@@ -36,6 +36,9 @@
 
 #include "ns3/spf.h"
 #include <map>
+#include <list>
+#include <utility>
+
 
 
 namespace ns3 {
@@ -56,6 +59,12 @@ class PointToPointNetDeviceGES;
 
 class ErrorModel;
 class UniformRandomVariable;
+
+ struct RemoteSatelliteARQBuffer;
+ struct RemoteSatellite;
+
+ struct RemoteSatelliteARQBufferTx;
+ struct RemoteSatelliteTx;
 
 
 
@@ -101,6 +110,20 @@ public:
     //#define V 22
     #define V 24 //two GES station
     #define TTLmax 24 //two GES station
+
+    #define BUFFERSIZE 100 //should be changed to be configurable
+    #define ARQCOUNT 3
+    #define DATAACK 43
+    #define N_ACK 34
+
+    
+    #define ACK_REC 1
+    #define TRANSMITTED 2
+    #define NO_TRANSMITTED 3
+   
+    #define NACKNUMSTART 3
+
+
 
 
   /**
@@ -262,7 +285,28 @@ public:
   
 
 
+void ARQReceive (Mac48Address src, Mac48Address dst, Time rece, uint32_t size , uint32_t protocol,  uint32_t packetid, Ptr<Packet> packet);
+RemoteSatellite* ARQLookup (Mac48Address src, Time rece, uint32_t size , uint32_t protocol, uint32_t packetid)  const;
+void CheckAvailablePacket (RemoteSatelliteARQBuffer * buffer, Mac48Address);
 
+RemoteSatelliteTx* ARQLookupTx (Mac48Address dst, uint32_t packetid)  const;
+Ptr<Packet> ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Packet> packet);
+Ptr<Packet> ARQSend (RemoteSatelliteARQBufferTx * buffer);
+
+void ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint32_t packetid);
+
+
+void ARQACKRecevie (Mac48Address dst, uint32_t packetid);
+void ARQN_ACKRecevie (Mac48Address dst, uint32_t packetid); 
+
+bool ARQTxBufferCheck (RemoteSatelliteARQBufferTx * buffer) const;
+bool ARQRxBufferCheck (RemoteSatelliteARQBuffer * buffer) const;
+
+
+
+
+
+bool SendAck (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber, uint32_t packetid, uint32_t ackType);
 
 
 
@@ -674,9 +718,17 @@ private:
    typedef void (* RecPacketCallback)
     (const Mac48Address addr, const Mac48Address from, const Mac48Address to, const Time ts, const uint32_t rx,
      const uint32_t tx);
+   
+   typedef void (* ARQRecPacketCallback)
+    (const Mac48Address addr, const Mac48Address from, const Ptr<Packet> packet, const Time rx, const uint32_t size,
+     const uint32_t protocol, const uint32_t packetid);
      
     TracedCallback<Mac48Address, Time, uint32_t, uint32_t > m_channelSelected;
     TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t > m_recPacketTrace;
+    TracedCallback<Mac48Address, Mac48Address, Ptr<Packet>, Time, uint32_t, uint32_t, uint32_t > m_ARQrecPacketTrace; 
+    
+    
+    
     
     uint32_t Topology[V][V];
     ShortPath  * CalPath;
@@ -698,13 +750,75 @@ private:
   bool m_TopoInitialized;
   
   EventId LEOupdateLinkDstEvent;
+  
+  
+   std::list< Mac48Address > RemoteAddressList;
+   std::list< Mac48Address >::iterator  RemoteAddressListIterator;
 
   
-    
-    
 
-
+ 
+   
+    typedef std::vector <RemoteSatellite *> StatDevice;
+    StatDevice m_statDevice;
+    
+    typedef std::vector <RemoteSatelliteTx *> StatDeviceTx;
+    StatDeviceTx m_statDeviceTx;
+    
+    EventId ARQAckTimeoutEvent;
+    Time ARQAckTimer;
 };
+
+
+struct RemoteSatelliteARQBuffer
+{
+   uint32_t m_bufferStart;
+   uint32_t m_bufferSize;
+   
+   uint32_t m_NACKNumStart;
+   
+   
+  //std::list<Ptr<PointToPointNetDeviceGES> >::iterator m_nodeGESIterator;
+  std::list<Ptr<Packet> > * m_listPacket;
+  std::list<Time > * m_listRecTime;
+  std::list<uint32_t > * m_listSize;
+  std::list<uint32_t > * m_listProtocol;
+  std::list<uint32_t > * m_listPacketId;
+};
+    
+ struct RemoteSatellite
+ {
+  virtual ~RemoteSatellite ();
+  RemoteSatelliteARQBuffer *m_buffer;
+  uint32_t m_retryCount;                  //!< STA short retry count
+  Mac48Address m_remoteAddress;
+};
+
+
+
+struct RemoteSatelliteARQBufferTx
+{
+   uint32_t m_bufferStart;
+   uint32_t m_bufferSize;
+   
+   
+  std::list<Ptr<Packet> > * m_listPacket;
+  std::list<Time > * m_listTxTime;
+  std::list<uint32_t > * m_listPacketId;
+  std::list<uint32_t > * m_listPacketStatus;
+  std::list<uint32_t > * m_listPacketRetryNum; 
+};
+    
+ struct RemoteSatelliteTx
+ {
+  virtual ~RemoteSatelliteTx ();
+  RemoteSatelliteARQBufferTx *m_buffer;
+  uint32_t m_retryCount;                  //!< STA short retry count
+  Mac48Address m_remoteAddress;
+};
+
+
+
 
 } // namespace ns3
 
