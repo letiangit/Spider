@@ -317,7 +317,13 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> (); 
-     devASecond->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+     
+     Ptr<Queue> queueForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueCriticalForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPriForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEffForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGroundForward = m_queueFactory.Create<Queue> (); 
+     devASecond->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround, queueForward, queueCriticalForward, queuehighPriForward, queueBestEffForward, queueBackGroundForward);
 
      //build connection between two device
      devAFirst->AddDevice (devASecond);
@@ -337,7 +343,15 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
-     devAFirst->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+     //devAFirst->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+     
+      Ptr<Queue> queueForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueCriticalForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPriForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEffForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGroundForward = m_queueFactory.Create<Queue> (); 
+     devAFirst->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround, queueForward, queueCriticalForward, queuehighPriForward, queueBestEffForward, queueBackGroundForward);
+
     }
   
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
@@ -355,7 +369,15 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
-     devBSecond->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+     //devBSecond->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+       Ptr<Queue> queueForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueCriticalForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPriForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEffForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGroundForward = m_queueFactory.Create<Queue> (); 
+     devBSecond->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround, queueForward, queueCriticalForward, queuehighPriForward, queueBestEffForward, queueBackGroundForward);
+
+     
      //build connection between two device
      devBFirst->AddDevice (devBSecond);
      devBSecond->AddDevice (devBFirst);
@@ -374,7 +396,14 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
-     devBFirst->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+     //devBFirst->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+       Ptr<Queue> queueForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueCriticalForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPriForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEffForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGroundForward = m_queueFactory.Create<Queue> (); 
+     devBFirst->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround, queueForward, queueCriticalForward, queuehighPriForward, queueBestEffForward, queueBackGroundForward);
+
     }
 
   bool useNormalChannel = true;
@@ -476,7 +505,15 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
-     devA->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+     //devA->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+     
+       Ptr<Queue> queueForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueCriticalForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPriForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEffForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGroundForward = m_queueFactory.Create<Queue> (); 
+     devA->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround, queueForward, queueCriticalForward, queuehighPriForward, queueBestEffForward, queueBackGroundForward);
+
     }
   
   m_nodeListIterator = find (m_nodeList.begin(), m_nodeList.end(), b);
@@ -501,7 +538,14 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
-     devB->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+    // devB->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround);
+       Ptr<Queue> queueForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueCriticalForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queuehighPriForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBestEffForward = m_queueFactory.Create<Queue> ();
+     Ptr<Queue> queueBackGroundForward = m_queueFactory.Create<Queue> (); 
+     devB->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround, queueForward, queueCriticalForward, queuehighPriForward, queueBestEffForward, queueBackGroundForward);
+
     }
 
 

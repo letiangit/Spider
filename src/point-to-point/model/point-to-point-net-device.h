@@ -39,6 +39,9 @@
 #include <list>
 #include <utility>
 
+#include "ns3/random-variable-stream.h"
+
+
 
 
 namespace ns3 {
@@ -111,7 +114,7 @@ public:
     #define V 24 //two GES station
     #define TTLmax 24 //two GES station
 
-    #define BUFFERSIZE 100 //should be changed to be configurable
+    //#define BUFFERSIZE 100 //should be changed to be configurable
     #define ARQCOUNT 3
     #define DATAACK 43
     #define N_ACK 34
@@ -185,7 +188,11 @@ public:
    *
    * \param queue Ptr to the new queue.
    */
-  void SetQueue (Ptr<Queue> queue, Ptr<Queue> queueCritical, Ptr<Queue> queuehighPri, Ptr<Queue> queueBestEff, Ptr<Queue> queueBackGround); 
+  void SetQueue (Ptr<Queue> q, Ptr<Queue> queueCritical, Ptr<Queue> queuehighPri, Ptr<Queue> queueBestEff, Ptr<Queue> queueBackGround, 
+          Ptr<Queue> queueForward, Ptr<Queue> queueCriticalForward, Ptr<Queue> queuehighPriForward, Ptr<Queue> queueBestEffForward, Ptr<Queue> queueBackGroundForward);
+
+
+  //void SetQueue (Ptr<Queue> queue, Ptr<Queue> queueCritical, Ptr<Queue> queuehighPri, Ptr<Queue> queueBestEff, Ptr<Queue> queueBackGround); 
   void SetQueue (Ptr<Queue> queue); 
 
   /**
@@ -306,7 +313,7 @@ bool ARQRxBufferCheck (RemoteSatelliteARQBuffer * buffer) const;
 
 
 
-bool SendAck (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber, uint32_t packetid, uint32_t ackType);
+bool SendAck (const Address &dest, uint16_t protocolNumber, uint32_t packetid, uint32_t ackType, uint32_t qos);
 
 
 
@@ -317,6 +324,10 @@ bool SendAck (Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber, 
   void AddGESDevice (Ptr<PointToPointNetDeviceGES> dev);
   
   void ReceiveFromGES (Ptr<Packet> packet);
+  
+  void  EnqueueForward (Ptr<Packet> packet);
+  Ptr<Packet>  DequeueForward (void);
+
   
 
     
@@ -661,6 +672,17 @@ private:
   static uint16_t EtherToPpp (uint16_t protocol);
   typedef std::map<uint8_t, Ptr<Queue> > Queues;
   Queues m_queueMap;
+  Ptr<Queue> m_queueQos3;
+  Ptr<Queue> m_queueQos2;
+  Ptr<Queue> m_queueQos1;
+  Ptr<Queue> m_queueQos0;
+  
+  Queues m_queueForward;
+  Ptr<Queue> m_queueForwardQos4;
+  Ptr<Queue> m_queueForwardQos3;
+  Ptr<Queue> m_queueForwardQos2;
+  Ptr<Queue> m_queueForwardQos1;
+  Ptr<Queue> m_queueForwardQos0;
   
   ObjectFactory m_queueFactory;         //!< Queue Factory
 
@@ -717,15 +739,22 @@ private:
    
    typedef void (* RecPacketCallback)
     (const Mac48Address addr, const Mac48Address from, const Mac48Address to, const Time ts, const uint32_t rx,
-     const uint32_t tx);
+     const uint32_t tx, const uint32_t id);
    
    typedef void (* ARQRecPacketCallback)
     (const Mac48Address addr, const Mac48Address from, const Ptr<Packet> packet, const Time rx, const uint32_t size,
-     const uint32_t protocol, const uint32_t packetid);
+     const uint32_t qos, const uint32_t packetid);
+   
+   
+      typedef void (* ARQTxPacketCallback)
+    (const Mac48Address addr, const Mac48Address to, const uint32_t packetid,const uint32_t qos, const uint32_t retrans, const bool success);
      
     TracedCallback<Mac48Address, Time, uint32_t, uint32_t > m_channelSelected;
-    TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t > m_recPacketTrace;
+    TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t, uint32_t > m_recPacketTrace;
     TracedCallback<Mac48Address, Mac48Address, Ptr<Packet>, Time, uint32_t, uint32_t, uint32_t > m_ARQrecPacketTrace; 
+    TracedCallback<Mac48Address, Mac48Address, uint32_t, uint32_t, uint32_t, bool > m_ARQTxPacketTrace;
+    
+    
     
     
     
@@ -767,6 +796,13 @@ private:
     
     EventId ARQAckTimeoutEvent;
     Time ARQAckTimer;
+    
+    uint32_t ARQ_Packetid;
+    
+    uint32_t BUFFERSIZE;
+    
+    Ptr<UniformRandomVariable> m_random;  //!< Provides uniform random variables.
+
 };
 
 
@@ -784,6 +820,9 @@ struct RemoteSatelliteARQBuffer
   std::list<uint32_t > * m_listSize;
   std::list<uint32_t > * m_listProtocol;
   std::list<uint32_t > * m_listPacketId;
+  std::list<uint32_t > * m_listNAackNum; //NACKNUM2903
+
+  
 };
     
  struct RemoteSatellite

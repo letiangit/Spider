@@ -31,8 +31,13 @@
 #include "point-to-point-net-device.h"
 #include "ns3/net-device.h"
 
+#include "ppp-header.h"
+
+#include <iostream>
+#include <fstream>
 
 
+using namespace std;
 
 
 namespace ns3 {
@@ -67,6 +72,11 @@ SpiderClient::GetTypeId (void)
                    UintegerValue (1024),
                    MakeUintegerAccessor (&SpiderClient::m_size),
                    MakeUintegerChecker<uint32_t> (12,1500))
+    .AddAttribute ("Qos",
+                   "Size of packets generated. The minimum packet size is 12 bytes which is the size of the header carrying the sequence number and the time stamp.",
+                   UintegerValue (3),
+                   MakeUintegerAccessor (&SpiderClient::m_Qos),
+                   MakeUintegerChecker<uint32_t> (0,3))
   ;
   return tid;
 }
@@ -79,6 +89,10 @@ SpiderClient::SpiderClient ()
   m_count = 1000;
   m_interval = Seconds (100.0);
   m_size = 1024;
+  m_Qos = 3;
+  m_constantRate = true;
+  m_poissonRate = 1.0;
+  chunksize = 1327;
 }
 
 SpiderClient::~SpiderClient ()
@@ -116,6 +130,35 @@ SpiderClient::SetPacketSize (uint32_t size)
   m_size = size;
 }
 
+void
+SpiderClient::SetQos (uint32_t qos)
+{
+  NS_LOG_FUNCTION (this << qos);
+  m_Qos = qos;
+}
+
+void
+SpiderClient::SetConstantRate (bool constant)
+{
+  NS_LOG_FUNCTION (this << constant);
+  m_constantRate = constant;
+}
+
+void
+SpiderClient::SetOutputpath (std::string path)
+{
+  NS_LOG_FUNCTION (this << path);
+  m_Outputpath = path;
+}
+
+
+void
+SpiderClient::SetPoissonRate (double rate)
+{
+  NS_LOG_FUNCTION (this << rate);
+  m_poissonRate = rate;
+}
+
 
 void
 //SpiderClient::InstallDevice (Ptr<PointToPointNetDevice> dev)
@@ -132,6 +175,13 @@ SpiderClient::DoDispose (void)
 {
   NS_LOG_FUNCTION (this);
   Application::DoDispose ();
+}
+
+
+double
+SpiderClient::nextTime(double rateParameter)
+{
+    return -logf(1.0f - (float) random() / (RAND_MAX)) / rateParameter;
 }
 
 void
@@ -160,6 +210,7 @@ SpiderClient::Stop (void)
 
 
 
+
   
 void
 SpiderClient::Send (void)
@@ -167,16 +218,49 @@ SpiderClient::Send (void)
   NS_LOG_FUNCTION (this);
   NS_ASSERT (m_sendEvent.IsExpired ());
   
-  Ptr<Packet> p = Create<Packet> (m_size); 
-  m_Device->Send (p, m_peerAddress, 2048);
-  ++m_sent;
+
+  uint32_t fragementnumber = std::ceil(m_size/chunksize) + 1; //ceil
   
-  NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " client sent packet to " << m_peerAddress << " m_sent " << m_sent << " size " << m_size );
+  for (uint32_t kk = 0; kk < fragementnumber; kk++)
+  {
+      Ptr<Packet> p = Create<Packet> (chunksize); 
+      m_Device->Send (p, m_peerAddress, 2048+m_Qos);
+      NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize );
+      std::string dropfile=m_Outputpath;
+      myfile.open (dropfile, ios::out | ios::app);
+      myfile <<  Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize << "\n";
+      myfile.close();
+  }
   
-  if (m_sent < m_count)
+    if (m_sent < m_count)
     {
-      m_sendEvent = Simulator::Schedule (m_interval, &SpiderClient::Send, this);
+      ++m_sent;
+      if (m_constantRate)
+      {
+           m_sendEvent = Simulator::Schedule (m_interval, &SpiderClient::Send, this);
+           NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " client sent packet to " << m_peerAddress << " m_sent " << m_sent << "  size " << m_size );
+          
+           std::string dropfile=m_Outputpath;
+           myfile.open (dropfile, ios::out | ios::app);
+           myfile << Simulator::Now () << ", " << m_Device->GetAddress () << " constant, client sent packet to " << m_peerAddress << " m_sent " << m_sent << "  size " << m_size << "\n";
+           myfile.close();
+      }
+      else //Poisson distribution
+      {
+          double rate = m_poissonRate;
+          double nextseconds = nextTime(rate)*1000;
+          m_sendEvent = Simulator::Schedule (Seconds (nextseconds), &SpiderClient::Send, this); 
+          NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " poisson client sent packet to " << m_peerAddress << " m_sent " << m_sent << " size " << m_size );
+                    
+          std::string dropfile=m_Outputpath;
+          myfile.open (dropfile, ios::out | ios::app);
+          myfile << Simulator::Now () << ", " << m_Device->GetAddress () << " poisson, client sent packet to " << m_peerAddress << " m_sent " << m_sent << "  size " << m_size << "\n";
+          myfile.close();
+      }
     }
+  
+  
+ 
 }
 
 } // Namespace ns3
