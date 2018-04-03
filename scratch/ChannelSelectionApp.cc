@@ -398,7 +398,7 @@ main (int argc, char *argv[])
         clientAppNoAlter->SetRemote (Mac48Address::ConvertFrom (nodes.Get(Nnodes - 1)->GetDevice(0)->GetAddress()) );
         
         clientAppNoAlter->SetMaxPackets (2147483648);
-        clientAppNoAlter->SetInterval (Seconds(1)); //1
+        clientAppNoAlter->SetInterval (Seconds(2)); //1
         clientAppNoAlter->SetPacketSize (30000); //30k
         clientAppNoAlter->SetQos (1);
         clientAppNoAlter->SetConstantRate (true);

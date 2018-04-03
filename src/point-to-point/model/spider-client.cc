@@ -228,7 +228,7 @@ SpiderClient::Send (void)
       NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize );
       std::string dropfile=m_Outputpath;
       myfile.open (dropfile, ios::out | ios::app);
-      myfile <<  Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize << "\n";
+      //myfile <<  Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize << "\n";
       myfile.close();
   }
   
@@ -242,7 +242,7 @@ SpiderClient::Send (void)
           
            std::string dropfile=m_Outputpath;
            myfile.open (dropfile, ios::out | ios::app);
-           myfile << Simulator::Now () << ", " << m_Device->GetAddress () << " constant, client sent packet to " << m_peerAddress << " m_sent " << m_sent << "  size " << m_size << "\n";
+           //myfile << Simulator::Now () << ", " << m_Device->GetAddress () << " constant, client sent packet to " << m_peerAddress << " m_sent " << m_sent << "  size " << m_size << "\n";
            myfile.close();
       }
       else //Poisson distribution
@@ -254,7 +254,7 @@ SpiderClient::Send (void)
                     
           std::string dropfile=m_Outputpath;
           myfile.open (dropfile, ios::out | ios::app);
-          myfile << Simulator::Now () << ", " << m_Device->GetAddress () << " poisson, client sent packet to " << m_peerAddress << " m_sent " << m_sent << "  size " << m_size << "\n";
+          //myfile << Simulator::Now () << ", " << m_Device->GetAddress () << " poisson, client sent packet to " << m_peerAddress << " m_sent " << m_sent << "  size " << m_size << "\n";
           myfile.close();
       }
     }

@@ -3165,8 +3165,8 @@ PointToPointNetDevice::Send (
   {
        uint16_t nextHop = LookupRoutingTable (Mac48Address::ConvertFrom(dest));
 
-       NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << "\t my address:" << GetAddress()  <<  " --route to " << nextHop << ", packet " << packet->GetSize() <<
-               ", protocolNumber " << protocolNumber);
+       //NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << "\t my address:" << GetAddress()  <<  " --route to " << nextHop << ", packet " << packet->GetSize() <<
+        //       ", protocolNumber " << protocolNumber);
        m_destAddress = Mac48Address::ConvertFrom(dest);
        m_type =  DATATYPE;
        
@@ -3272,7 +3272,8 @@ unicast:
  // NS_LOG_UNCOND ("send data m_Qos " << uint16_t(m_Qos));
   m_queueMap.find (m_Qos)->second->Enqueue (packet); //uppper layer queue
   
-  
+   NS_LOG_UNCOND(Simulator::Now() << "\t" << GetAddress () << " send packet size  " << packet->GetSize()  << " original id " << ppp.GetID () <<  "  qos " << uint16_t(m_Qos));
+ 
   
 
   Ptr<Packet> packetARQ;
@@ -3367,6 +3368,11 @@ PointToPointNetDevice::DequeueForward (void)
               //NS_LOG_UNCOND ( "size " << m_queueForward.find (qos-1)->second->GetNPackets () );
               //NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () <<" forwardqueue dequeue m_Qos " << uint16_t(ppp.GetQos ()) << ", id " << ppp.GetID () << ", size " << packet->GetSize () << " src " << ppp.GetSourceAddre ());  
              }
+           if (Simulator::Now().GetSeconds () > 14900)
+             {
+              //NS_LOG_UNCOND ( "size " << m_queueForward.find (qos-1)->second->GetNPackets () );
+              //NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () <<" forwardqueue dequeue m_Qos " << uint16_t(ppp.GetQos ()) << ", id " << ppp.GetID () << ", size " << packet->GetSize () << " src " << ppp.GetSourceAddre ());  
+             }
            return packet;
          }
      } 
@@ -3413,25 +3419,25 @@ PointToPointNetDevice::PreparePacketToSend ()
 
             if (buffer->m_bufferSize == buffer->m_listPacket->size ()  )
              {
-               NS_LOG_UNCOND (GetAddress () <<  " ARQ is full, packets are not dequeued" << " buffer->m_bufferSize " << buffer->m_bufferSize << ", buffer->m_listPacket->size ()  " << buffer->m_listPacket->size () ); 
+               //NS_LOG_UNCOND (GetAddress () <<  " ARQ is full, packets are not dequeued" << " buffer->m_bufferSize " << buffer->m_bufferSize << ", buffer->m_listPacket->size ()  " << buffer->m_listPacket->size () ); 
                packet = ARQSend (buffer);
              }
             else 
              {
                NS_ASSERT(buffer->m_bufferSize > buffer->m_listPacket->size ());
                packetSend = m_queueMap.find (qos-1)->second->Dequeue (); 
-               NS_LOG_UNCOND (GetAddress () << " ARQ is not full, packets are not dequeued"); 
+               //NS_LOG_UNCOND (GetAddress () << " ARQ is not full, packets are not dequeued"); 
               packet = ARQSend (buffer, packetSend);               
              }
             //NS_ASSERT (packet != 0); this could happen if all packet are sent but not receive ack
             if (packet !=0)
             {
             packet->PeekHeader (ppp);
-            NS_LOG_UNCOND (GetAddress () <<  " get ARQ packet id " <<  ppp.GetID () << ", size  " << packet->GetSize () << ", qos  " << ppp.GetQos () ); 
+            //NS_LOG_UNCOND (GetAddress () <<  " get ARQ packet id " <<  ppp.GetID () << ", size  " << packet->GetSize () << ", qos  " << ppp.GetQos () ); 
             }
             else
             {
-                NS_LOG_UNCOND (GetAddress () <<  " get ARQ packet 0 "  ); 
+               // NS_LOG_UNCOND (GetAddress () <<  " get ARQ packet 0 "  ); 
 
             }
 
@@ -3952,7 +3958,13 @@ PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint3
                PppHeader ppp;
             Copypackettrace->PeekHeader (ppp);
             NS_LOG_UNCOND (GetAddress () << " pop_front tx packet dropped due to previous ACK_REC , with id " << id << ", transmission time " <<  retrynum << ", " << ppp.GetDestAddre ());
-            
+                     Ptr<Packet> packetSend = PreparePacketToSend ();
+                          if (packetSend == 0)
+                           {
+                                NS_LOG_UNCOND (GetAddress () << " Timeout, no packet got from ARQ "  );
+                                return;
+                           }
+                          EnqueueForward (packetSend);
          
             m_ARQTxPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetDestAddre (), id, ppp.GetQos (), retrynum, false );
             break;
@@ -3980,6 +3992,14 @@ PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint3
             
          
             m_ARQTxPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetDestAddre (), id, ppp.GetQos (), retrynum, false );
+            
+                    Ptr<Packet> packetSend = PreparePacketToSend ();
+                          if (packetSend == 0)
+                           {
+                                NS_LOG_UNCOND (GetAddress () << " Timeout, no packet got from ARQ "  );
+                                return;
+                           }
+                          EnqueueForward (packetSend);
             break;
         }
         else if ( (*it) == packetid &&  (*PacketStatusiterator) == TRANSMITTED )
@@ -3992,22 +4012,16 @@ PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint3
             PacketStatusiterator = buffer->m_listPacketStatus->erase (PacketStatusiterator);
             buffer->m_listPacketStatus->insert (PacketStatusiterator, NO_TRANSMITTED);
             //packetInbuffer = true;
-                  /*
-                  if (m_txMachineState == READY)
-                    {
-                          Ptr<Packet> packetSend = PreparePacketToSend ();
-                          if (packetSend == 0)
-                           {
-                                return;
-                             }
-                            TransmitStart (packetSend);
-                   } */
+                            
+                          
+                           
+                   
             //ARQSend (buffer);
             break;
         }
        else
         {
-            
+                      
         }
         PacketStatusiterator++;
         PacketRetryNumiterator++;
@@ -4037,15 +4051,27 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
     RemoteSatelliteTx * Satellite = ARQLookupTx (dst, packetid); 
     RemoteSatelliteARQBufferTx * buffer = Satellite->m_buffer;
     
-             NS_LOG_UNCOND (GetAddress () << " receives ack, with id " << packetid  << ", from  " <<  dst );
+             //NS_LOG_UNCOND (GetAddress () << " receives ack, with id " << packetid  << ", from  " <<  dst );
              NS_LOG_UNCOND ("buffer->m_bufferSize " << buffer->m_bufferSize <<  ", buffer->m_listPacket->size " << buffer->m_listPacket->size () );
 
 
     
     ARQTxBufferCheck (buffer);
     
+        if (buffer->m_listPacketId->size () == 0)
+        {
+             Ptr<Packet> packetSend = PreparePacketToSend ();
+                          if (packetSend == 0)
+                           {
+                                NS_LOG_UNCOND (GetAddress () << " ARQACKRecevie, no packet got from ARQ "  );
+                                return;
+                           }
+                          EnqueueForward (packetSend);
+            return;
+        }
+    
     NS_ASSERT (buffer->m_listPacketId->front () == buffer->m_bufferStart);
-    if (buffer->m_listPacketId->front () == packetid && buffer->m_listPacketStatus->front () == TRANSMITTED)
+    if (buffer->m_listPacketId->front () == packetid ) // && buffer->m_listPacketStatus->front () == TRANSMITTED)
       {
          uint32_t id = buffer->m_listPacketId->front ();
          Ptr<Packet> packettrace = buffer->m_listPacket->front ();
@@ -4073,8 +4099,18 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
 
          
          Ptr<const Packet>  packetkPeek;
-         Ptr<Packet>  packetSend;
-         Ptr<Packet>  packet;
+         //Ptr<Packet>  packetSend;
+         Ptr<Packet>  packet;  
+                      
+                         Ptr<Packet> packetSend = PreparePacketToSend ();
+                          if (packetSend == 0)
+                           {
+                                NS_LOG_UNCOND (GetAddress () << " ARQACKRecevie2, no packet got from ARQ "  );
+                                return;
+                           }
+                          EnqueueForward (packetSend);
+                          
+                   
          for (uint8_t qos = 4; qos > 0; qos--)
            {
              packetkPeek = m_queueMap.find (qos-1)->second->Peek ();
@@ -4167,7 +4203,7 @@ PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer)
             buffer->m_listPacketRetryNum->insert (PacketRetryNumiterator, retry_num);
             
 
-         NS_LOG_UNCOND (GetAddress () << "  aaARQSend and sechedule ARQAckTimer " << buffer->m_listPacketId->size () << " " << Simulator::Now () << " " << *PacketIditerator << ", size " << packet->GetSize () );
+         //NS_LOG_UNCOND (GetAddress () << "  aaARQSend and sechedule ARQAckTimer " << buffer->m_listPacketId->size () << " " << Simulator::Now () << " " << *PacketIditerator << ", size " << packet->GetSize () );
             
            if ( !ARQAckTimeoutEvent.IsRunning () )
              {
@@ -4215,6 +4251,8 @@ PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Packet>
     PppHeader ppp;
     packet->PeekHeader (ppp);
     Time txTime = Seconds (0);
+    
+    NS_LOG_UNCOND(GetAddress () << " original id  " << ppp.GetID()  << " new id " << ARQ_Packetid);
         
     uint16_t protocol = 0;
      ProcessHeader (packet, protocol);//t0 do
@@ -4235,7 +4273,7 @@ PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Packet>
     buffer->m_listPacketRetryNum->push_back (0);
     
     ARQ_Packetid++;
-    NS_LOG_UNCOND (GetAddress () << "  ARQSend am_listPacketId size " << buffer->m_listPacketId->size () << ", id " << pppTest.GetID () << ", " << pppTest.GetDestAddre ());
+    //NS_LOG_UNCOND (GetAddress () << "  ARQSend am_listPacketId size " << buffer->m_listPacketId->size () << ", id " << pppTest.GetID () << ", " << pppTest.GetDestAddre ());
 
     
     return ARQSend (buffer); 
