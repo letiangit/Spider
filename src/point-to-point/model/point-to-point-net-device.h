@@ -111,7 +111,7 @@ public:
     //#define PACKETREPEATNUMBER 4
     
     //#define V 22
-    #define V 24 //two GES station
+    #define V 22 //two GES station
     #define TTLmax 24 //two GES station
 
     //#define BUFFERSIZE 100 //should be changed to be configurable
@@ -329,6 +329,7 @@ bool SendAck (const Address &dest, uint16_t protocolNumber, uint32_t packetid, u
   
   void  EnqueueForward (Ptr<Packet> packet);
   Ptr<Packet>  DequeueForward (void);
+  Ptr<const Packet> PeekqueueForward (void);
 
 
     

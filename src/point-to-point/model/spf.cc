@@ -50,7 +50,7 @@ ShortPath::printSolution(uint32_t dist[],uint32_t PreNodes[V], uint32_t src)
         //std::cout <<  " next hop " << nexthop  << std::endl;
         RoutingTable[i] = nexthop;
         
-        std::cout << " "  << std::endl;
+       // std::cout << " "  << std::endl;
 
     }
     return &RoutingTable[0];

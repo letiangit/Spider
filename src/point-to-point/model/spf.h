@@ -21,7 +21,7 @@ namespace ns3
 {
 public:
     //#define V 22
-    #define V 24 //two GES station
+    #define V 22 //two GES station
     uint32_t graph[V][V];
 
     ShortPath ();
