@@ -573,6 +573,9 @@ PointToPointNetDevice::TransmitStart (Ptr<Packet> p)
   //enqueue
   
   
+
+
+   
   //
   //
   // This function is called to start the process of transmitting a packet.
@@ -636,7 +639,6 @@ PointToPointNetDevice::TransmitComplete (void)
       // No packet was on the queue, so we just exit.
       //
      //NS_LOG_UNCOND (GetAddress () <<" return TransmitComplete" );
-
       return;
     }
 
@@ -3487,6 +3489,8 @@ PointToPointNetDevice::PreparePacketToSend ()
 }
 
 
+
+
 bool
 PointToPointNetDevice::SendFrom (Ptr<Packet> packet, 
                                  const Address &source, 
@@ -3662,6 +3666,7 @@ PointToPointNetDevice::CheckAvailablePacket (RemoteSatelliteARQBuffer * buffer, 
         buffer->m_listPacketId->pop_front ();
         
         buffer->m_bufferStart++;
+        buffer->m_NACKNumStart = 0;
         
         //NS_LOG_UNCOND (GetAddress () << " pop_front rx packet upload to upper layer, with id " << id << ", buffer->m_bufferStart " << buffer->m_bufferStart);
 
@@ -3704,13 +3709,13 @@ PointToPointNetDevice::ARQReceive (Mac48Address src, Mac48Address dst, Time rxti
       {
          // drop the packet
         //send ack 
-        SendAck (src, 2048,  packetid, DATAACK, protocol); // //protocol is qos acuralllyl, to do
+        //SendAck (src, 2048,  packetid, DATAACK, protocol); // //protocol is qos acuralllyl, to do
         return;
       }
     else if (packetid > start  && packetid < start + buffer->m_bufferSize)
       {
         //send ack 
-        SendAck (src, 2048,  packetid, DATAACK, protocol);
+        //SendAck (src, 2048,  packetid, DATAACK, protocol);
         goto bufferpacket; //buffer the packet 
       } 
     else if (packetid > start + buffer->m_bufferSize || packetid == start + buffer->m_bufferSize)
@@ -3722,11 +3727,13 @@ PointToPointNetDevice::ARQReceive (Mac48Address src, Mac48Address dst, Time rxti
       {
         //deliver to upper layer
         m_ARQrecPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), src , packet, rxtime, size, protocol,  packetid);
-        SendAck (src, 2048,  packetid, DATAACK, protocol);
-        start++;
-        buffer->m_bufferStart++;                    
+        //SendAck (src, 2048,  packetid, DATAACK, protocol);
+        //start++;
+        buffer->m_bufferStart++; 
+        buffer->m_NACKNumStart = 0;
 
         //check the next packet
+        SendAck (src, 2048,  buffer->m_bufferStart, DATAACK, protocol);
         CheckAvailablePacket (buffer, src);
         return;
       }
@@ -3803,11 +3810,14 @@ PointToPointNetDevice::ARQReceive (Mac48Address src, Mac48Address dst, Time rxti
       CheckAvailablePacket (buffer, src);
    }
    start = buffer->m_bufferStart; 
+   //SendAck (src, 2048,  start, N_ACK, protocol);
+   SendAck (src, 2048,  start, DATAACK, protocol);
    
    
     //std::list<uint32_t >::const_iterator NAackNumiterator = buffer->m_listNAackNum->begin (); //NACKNUM2903
-
-   for (uint32_t M = start; M < packetid; M++)
+   
+   /*
+   for (uint32_t M = start; M <= start; M++)
     {
        bool packetReceived = false;
         //If M is marked as not received: send a NACK with ID = M
@@ -3827,6 +3837,7 @@ PointToPointNetDevice::ARQReceive (Mac48Address src, Mac48Address dst, Time rxti
           }
            //send NACK with M
     }
+   */
   
 }
 
@@ -3907,39 +3918,37 @@ PointToPointNetDevice::ARQTxBufferCheck (RemoteSatelliteARQBufferTx * buffer) co
 }
 
 
- 
-
 void
-PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint32_t packetidinput)
+PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer)
 {
     ARQTxBufferCheck (buffer);
     uint32_t packetidstart = buffer->m_listPacketId->front ();
-    
-    NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " ARQAckTimeout with id " << packetidinput << ", packetidstart " << packetidstart  );
-
+    //NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress ()  << ", packetidstart " << packetidstart  );
     bool packetInbuffer = false;
-    /*
-    if ( ARQAckTimeoutEvent.IsRunning () )
-      {
-        ARQAckTimeoutEvent.Cancel (); // ARQAckTimeoutEvent can be overwritten, maybe not use
-      } 
-     */
-    
+    uint32_t txTimeUs;
+    uint32_t currentTimeUs;
+    bool IsPacketTimeOut;
    // std::list<uint32_t >::const_iterator PacketStatusiterator = buffer->m_listPacketStatus->begin ();
    // std::list<uint32_t >::const_iterator PacketRetryNumiterator = buffer->m_listPacketRetryNum->begin ();
- for (uint32_t packetid = packetidstart; packetid <= packetidinput; packetid++)
- {
-     
+
+    std::list<uint32_t >::const_iterator PacketStatusiterator = buffer->m_listPacketStatus->begin ();
+    std::list<uint32_t >::const_iterator PacketRetryNumiterator = buffer->m_listPacketRetryNum->begin ();
+    std::list<Time >::const_iterator TxTimeiterator = buffer->m_listTxTime->begin ();
+
+    uint32_t CheckbufferStart_ACK = buffer->m_listPacketId->front ();
+   for (uint32_t packetid = packetidstart; packetid <= buffer->m_listPacketId->back (); packetid++)
+   {
       std::list<uint32_t >::const_iterator PacketStatusiterator = buffer->m_listPacketStatus->begin ();
       std::list<uint32_t >::const_iterator PacketRetryNumiterator = buffer->m_listPacketRetryNum->begin ();
+      std::list<Time >::const_iterator TxTimeiterator = buffer->m_listTxTime->begin ();
       uint32_t CheckbufferStart_ACK = buffer->m_listPacketId->front ();
-    
+      
     for (std::list<uint32_t >::const_iterator it = buffer->m_listPacketId->begin (); it != buffer->m_listPacketId->end (); it++)
      {
-         //NS_LOG_UNCOND (GetAddress () << " with packetidstart " << packetid << ", packetidinput  " <<  packetidinput << ", " << (*it) );
-       
+        
          if ( (*it) == CheckbufferStart_ACK &&  (*PacketStatusiterator) == ACK_REC ) //for packets with REC status
           {
+             NS_FATAL_ERROR  ("should not happen");
             //NS_ASSERT ( packetid == buffer->m_bufferStart); // assume this packet should be at front of the window. to do
             //NS_ASSERT ( it == buffer->m_listPacketId->begin ()); // assume this packet should be at front of the window. to do
             uint32_t id = buffer->m_listPacketId->front ();
@@ -3955,24 +3964,33 @@ PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint3
             buffer->m_bufferStart++;
             //packetInbuffer = true;
             
-               PppHeader ppp;
+            PppHeader ppp;
             Copypackettrace->PeekHeader (ppp);
             NS_LOG_UNCOND (GetAddress () << " pop_front tx packet dropped due to previous ACK_REC , with id " << id << ", transmission time " <<  retrynum << ", " << ppp.GetDestAddre ());
-                     Ptr<Packet> packetSend = PreparePacketToSend ();
-                          if (packetSend == 0)
-                           {
-                                NS_LOG_UNCOND (GetAddress () << " Timeout, no packet got from ARQ "  );
-                                return;
-                           }
-                          EnqueueForward (packetSend);
+            Ptr<Packet> packetSend = PreparePacketToSend ();
+            if (packetSend == 0)
+                {
+                    NS_LOG_UNCOND (GetAddress () << " Timeout, no packet got from ARQ "  );
+                    return;
+                }
+            EnqueueForward (packetSend);
          
             m_ARQTxPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetDestAddre (), id, ppp.GetQos (), retrynum, false );
             break;
-          }
-         else if ( (*it) == packetid &&  (*PacketStatusiterator) == TRANSMITTED && (*PacketRetryNumiterator) == ARQCOUNT ) //timout for all packets, to do
-        {
-            //NS_ASSERT ( packetid == buffer->m_bufferStart); // assume this packet should be at front of the window. to do
-            //NS_ASSERT ( it == buffer->m_listPacketId->begin ()); // assume this packet should be at front of the window. to do
+          } 
+        
+         txTimeUs = (*TxTimeiterator).GetMicroSeconds ();
+         currentTimeUs = Simulator::Now().GetMicroSeconds ();
+         if (currentTimeUs - txTimeUs > ARQAckTimer.GetMicroSeconds ())
+           {
+             IsPacketTimeOut = true;
+           }
+        
+         
+         if (  (*it) == packetid && (*PacketStatusiterator) == TRANSMITTED && (*PacketRetryNumiterator) == ARQCOUNT && IsPacketTimeOut ) 
+          {
+            //NS_ASSERT ( packetid == buffer->m_bufferStart); // assume this packet should be at front of the window. 
+            //NS_ASSERT ( it == buffer->m_listPacketId->begin ()); // assume this packet should be at front of the window. 
             uint32_t id = buffer->m_listPacketId->front ();
             Ptr<Packet> packettrace = buffer->m_listPacket->front ();
 
@@ -3986,51 +4004,42 @@ PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint3
             buffer->m_bufferStart++;
             //packetInbuffer = true;
             
-               PppHeader ppp;
+            PppHeader ppp;
             Copypackettrace->PeekHeader (ppp);
-            //NS_LOG_UNCOND (GetAddress () << " pop_front tx packet dropped due to acktimeout, with id " << id << ", transmission time " <<  retrynum << ", " << ppp.GetDestAddre ());
             
-         
+            NS_LOG_UNCOND (GetAddress () << " pop_front tx packet dropped due to acktimeout, with id " << id << ", transmission time " <<  retrynum << ", " << ppp.GetDestAddre ());
             m_ARQTxPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetDestAddre (), id, ppp.GetQos (), retrynum, false );
-            
-                    Ptr<Packet> packetSend = PreparePacketToSend ();
-                          if (packetSend == 0)
-                           {
-                                NS_LOG_UNCOND (GetAddress () << " Timeout, no packet got from ARQ "  );
-                                return;
-                           }
-                          EnqueueForward (packetSend);
+            Ptr<Packet> packetSend = PreparePacketToSend ();
+           if (packetSend == 0)
+             {
+               NS_LOG_UNCOND (GetAddress () << "  no packet got from ARQ "  );
+               return;
+             }
+            EnqueueForward (packetSend);
+            NS_LOG_UNCOND (GetAddress () << "  enqueue packets to forwarding  table "  );
             break;
-        }
-        else if ( (*it) == packetid &&  (*PacketStatusiterator) == TRANSMITTED )
-        {
-                        uint32_t retrynum = buffer->m_listPacketRetryNum->front ();
-
+          }
+        else if (  (*it) == packetid && (*PacketStatusiterator) == TRANSMITTED && (*PacketRetryNumiterator) > 0 && IsPacketTimeOut )
+          {
+            uint32_t retrynum = buffer->m_listPacketRetryNum->front ();
              //NS_LOG_UNCOND (GetAddress () << " not pop_front tx packet dropped due to acktimeout, with id " << packetid << ", transmission time " <<  retrynum );
 
             //NS_ASSERT ( (*PacketStatusiterator) == TRANSMITTED);
             PacketStatusiterator = buffer->m_listPacketStatus->erase (PacketStatusiterator);
             buffer->m_listPacketStatus->insert (PacketStatusiterator, NO_TRANSMITTED);
-            //packetInbuffer = true;
-                            
-                          
-                           
-                   
+            //packetInbuffer = true; 
             //ARQSend (buffer);
             break;
-        }
-       else
-        {
-                      
-        }
+          }
         PacketStatusiterator++;
         PacketRetryNumiterator++;
+        TxTimeiterator++;
      }
-
+   }
+    
+    ARQAckTimeoutEvent = Simulator::Schedule(ARQAckTimer, &PointToPointNetDevice::ARQAckTimeout, this, buffer );
     //NS_ASSERT (packetInbuffer);
- }
-}
-
+} 
 
 void
 PointToPointNetDevice::ARQN_ACKRecevie (Mac48Address dst, uint32_t packetid) 
@@ -4040,7 +4049,7 @@ PointToPointNetDevice::ARQN_ACKRecevie (Mac48Address dst, uint32_t packetid)
     
     ARQTxBufferCheck (buffer);
 
-    ARQAckTimeout (buffer, packetid);
+    //ARQAckTimeout (buffer, packetid);
 }
        
   
@@ -4051,14 +4060,12 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
     RemoteSatelliteTx * Satellite = ARQLookupTx (dst, packetid); 
     RemoteSatelliteARQBufferTx * buffer = Satellite->m_buffer;
     
-             //NS_LOG_UNCOND (GetAddress () << " receives ack, with id " << packetid  << ", from  " <<  dst );
-             NS_LOG_UNCOND ("buffer->m_bufferSize " << buffer->m_bufferSize <<  ", buffer->m_listPacket->size " << buffer->m_listPacket->size () );
-
-
+    //NS_LOG_UNCOND (GetAddress () << " receives ack, with id " << packetid  << ", from  " <<  dst );
+    //NS_LOG_UNCOND ("buffer->m_bufferSize " << buffer->m_bufferSize <<  ", buffer->m_listPacket->size " << buffer->m_listPacket->size () );
     
     ARQTxBufferCheck (buffer);
     
-        if (buffer->m_listPacketId->size () == 0)
+    if (buffer->m_listPacketId->size () == 0)
         {
              Ptr<Packet> packetSend = PreparePacketToSend ();
                           if (packetSend == 0)
@@ -4070,8 +4077,10 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
             return;
         }
     
-    NS_ASSERT (buffer->m_listPacketId->front () == buffer->m_bufferStart);
-    if (buffer->m_listPacketId->front () == packetid ) // && buffer->m_listPacketStatus->front () == TRANSMITTED)
+  NS_ASSERT (buffer->m_listPacketId->front () == buffer->m_bufferStart);
+  for (uint32_t kk = buffer->m_bufferStart; kk < packetid; kk++)
+   {
+    if (buffer->m_listPacketId->front () == kk ) // double check
       {
          uint32_t id = buffer->m_listPacketId->front ();
          Ptr<Packet> packettrace = buffer->m_listPacket->front ();
@@ -4084,15 +4093,10 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
          buffer->m_listPacketRetryNum->pop_front ();
          buffer->m_bufferStart++;
          
-         
-          PppHeader ppp;
+         PppHeader ppp;
          Copypackettrace->PeekHeader (ppp);
-         
          NS_LOG_UNCOND (GetAddress () << " pop_front tx packet receives ack, with id " << id  << ", transmission time " <<  retrynum << "\t" << ppp.GetDestAddre () << " id " << ppp.GetID ());
-        
          m_ARQTxPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), ppp.GetDestAddre (), id, ppp.GetQos (), retrynum, true);
-         
-         
          
          Ptr<Packet>  packetARQ = Create<Packet> ();
          m_ARQrecPacketTrace (Mac48Address::ConvertFrom(GetAddress ()), dst , packetARQ, Simulator::Now (), 19, 2048,  packetid);
@@ -4102,38 +4106,34 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
          //Ptr<Packet>  packetSend;
          Ptr<Packet>  packet;  
                       
-                         Ptr<Packet> packetSend = PreparePacketToSend ();
-                          if (packetSend == 0)
-                           {
-                                NS_LOG_UNCOND (GetAddress () << " ARQACKRecevie2, no packet got from ARQ "  );
-                                return;
-                           }
-                          EnqueueForward (packetSend);
-                          
-                   
-         for (uint8_t qos = 4; qos > 0; qos--)
-           {
-             packetkPeek = m_queueMap.find (qos-1)->second->Peek ();
-      
-             if (packetkPeek != 0)
-              {    
-                PppHeader ppp;
-                packetkPeek->PeekHeader (ppp);
-                if (dst == ppp.GetDestAddre () )
-                  {
-                    NS_LOG_UNCOND ("buffer->m_bufferSize " << buffer->m_bufferSize <<  ", buffer->m_listPacket->size " << buffer->m_listPacket->size ());
-
-                    NS_ASSERT(buffer->m_bufferSize > buffer->m_listPacket->size () || buffer->m_bufferSize == buffer->m_listPacket->size ());
-                    //packetSend = m_queueMap.find (qos-1)->second->Dequeue (); 
-                    //packet = ARQSend (buffer, packetSend); 
-                    //packet = ARQSend (buffer); 
-                    //NS_ASSERT (packet != 0);
-                  }     
+         Ptr<Packet> packetSend = PreparePacketToSend ();
+         if (packetSend == 0)
+             {
+                NS_LOG_UNCOND (GetAddress () << " no packet got from ARQ "  );
+                return;
              }
-           } // is this necessary? packet will be buffer anyway when queue is not empty. to do
-         return;
+         EnqueueForward (packetSend);
+           
+        
+         //return;
       }
+    else
+      {
+        NS_FATAL_ERROR  ("should not happen");
+      }
+   }
+  
+   ARQAckTimeout (buffer);
+   if (m_txMachineState == READY)
+   {
+         Ptr<Packet> packetforward = DequeueForward ();
+         if (packetforward !=0)
+         {
+          TransmitStart (packetforward);
+         }
+   }
     
+   /*
     std::list<uint32_t >::const_iterator PacketStatusiterator = buffer->m_listPacketStatus->begin ();
     std::list<Ptr<Packet> >::const_iterator Packetiterator = buffer->m_listPacket->begin ();
     std::list<Time >::const_iterator TxTimeiterator = buffer->m_listTxTime->begin ();
@@ -4151,20 +4151,15 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
         Packetiterator++;
         TxTimeiterator++;
     }
-
-
-    
+    */
 }
 
 
 Ptr<Packet> 
 PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer)  
 {   
-        ARQTxBufferCheck (buffer);
-        
-        //NS_LOG_UNCOND (GetAddress () << "  PointToPointNetDevice::ARQSend "  );
-
-
+     ARQTxBufferCheck (buffer);
+       
     if (buffer->m_listPacket->size () == 0)
       {
          return 0;
@@ -4172,6 +4167,9 @@ PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer)
     
     Ptr<Packet> packet;
     Ptr<Packet> packetReturn;
+    
+   //NS_LOG_UNCOND (GetAddress () << "  ARQSend am_listPacketId size " << buffer->m_listPacketId->size () << ", front " << buffer->m_listPacketId->front ());
+
 
     
     std::list<Ptr<Packet> >::const_iterator Packetiterator = buffer->m_listPacket->begin ();
@@ -4181,60 +4179,48 @@ PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer)
 
     ARQTxBufferCheck (buffer);
 
-
-    
     uint32_t retry_num = 0;        
     for (std::list<uint32_t >::const_iterator it = buffer->m_listPacketStatus->begin (); it != buffer->m_listPacketStatus->end (); it++)
     {
-        //NS_LOG_UNCOND (GetAddress () << "  ARQSend and sech" );
         if ((*it) == NO_TRANSMITTED)
         {
-
             packet =  (*Packetiterator);
 
             TxTimeiterator = buffer->m_listTxTime->erase (TxTimeiterator);
             buffer->m_listTxTime->insert (TxTimeiterator, Simulator::Now ());
-            
+
             it = buffer->m_listPacketStatus->erase (it);
+
             buffer->m_listPacketStatus->insert (it, TRANSMITTED);
+
             retry_num = (* PacketRetryNumiterator);
+
             PacketRetryNumiterator = buffer->m_listPacketRetryNum->erase (PacketRetryNumiterator);
+
             retry_num++;
             buffer->m_listPacketRetryNum->insert (PacketRetryNumiterator, retry_num);
-            
 
-         //NS_LOG_UNCOND (GetAddress () << "  aaARQSend and sechedule ARQAckTimer " << buffer->m_listPacketId->size () << " " << Simulator::Now () << " " << *PacketIditerator << ", size " << packet->GetSize () );
-            
-           if ( !ARQAckTimeoutEvent.IsRunning () )
-             {
-           //    NS_LOG_UNCOND (GetAddress () << " IsRunning aaARQSend and sechedule ARQAckTimer " << buffer->m_listPacketId->size () << " " << Simulator::Now () << " " << *PacketIditerator << ", size " << packet->GetSize () );
-
-               ARQAckTimeoutEvent = Simulator::Schedule(ARQAckTimer, &PointToPointNetDevice::ARQAckTimeout, this, buffer, *PacketIditerator );
-              } 
-     
-            
+                 
             packetReturn = packet->Copy ();
+            if ( !ARQAckTimeoutEvent.IsRunning () )
+              {
+                  ARQAckTimeoutEvent = Simulator::Schedule(ARQAckTimer, &PointToPointNetDevice::ARQAckTimeout, this, buffer);
+               } 
             return packetReturn;
         }
         
-        //NS_LOG_UNCOND (GetAddress () << "  ARQSend and sech 3878" );
-
         Packetiterator++;
-               // NS_LOG_UNCOND (GetAddress () << "  ARQSend and sech 3880" );
-
         TxTimeiterator++;
         PacketIditerator++;
         PacketRetryNumiterator++;
     }
     
-      //NS_LOG_UNCOND (GetAddress () << "  ARQSend all packet transmitted ....." );
-    
-            if ( !ARQAckTimeoutEvent.IsRunning () )
-             {
-                          // NS_LOG_UNCOND (GetAddress () << " IsRunning bbARQSend and sechedule ARQAckTimer " << buffer->m_listPacketId->size () << " " << Simulator::Now () << " " << buffer->m_listPacketId->front()   );
+     //NS_LOG_UNCOND (GetAddress () << "  after ARQSend am_listPacketId size " << buffer->m_listPacketId->size () << ", front " << buffer->m_listPacketId->front ());
 
-               ARQAckTimeoutEvent = Simulator::Schedule(ARQAckTimer, &PointToPointNetDevice::ARQAckTimeout, this, buffer, buffer->m_listPacketId->front() );
-              } 
+    if ( !ARQAckTimeoutEvent.IsRunning () )
+       {
+           ARQAckTimeoutEvent = Simulator::Schedule(ARQAckTimer, &PointToPointNetDevice::ARQAckTimeout, this, buffer);
+       } 
 
     return 0;
 }
@@ -4462,7 +4448,7 @@ unicast:
    packet->PeekHeader (ppp);
     
   m_Qos = ppp.GetQos ();
-  NS_LOG_UNCOND ("send ack m_Qos " << uint16_t(m_Qos));
+  //NS_LOG_UNCOND ("send ack m_Qos " << uint16_t(m_Qos));
   
             Ptr<Packet> PacketForwardtest = packet->Copy ();
 

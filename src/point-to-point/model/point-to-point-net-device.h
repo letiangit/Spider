@@ -300,7 +300,9 @@ RemoteSatelliteTx* ARQLookupTx (Mac48Address dst, uint32_t packetid)  const;
 Ptr<Packet> ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Packet> packet);
 Ptr<Packet> ARQSend (RemoteSatelliteARQBufferTx * buffer);
 
-void ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint32_t packetid);
+//void ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer, uint32_t packetid);
+void ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer);
+
 
 
 void ARQACKRecevie (Mac48Address dst, uint32_t packetid);
@@ -328,7 +330,6 @@ bool SendAck (const Address &dest, uint16_t protocolNumber, uint32_t packetid, u
   void  EnqueueForward (Ptr<Packet> packet);
   Ptr<Packet>  DequeueForward (void);
 
-  
 
     
 

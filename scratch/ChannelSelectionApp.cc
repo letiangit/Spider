@@ -173,7 +173,7 @@ main (int argc, char *argv[])
     
 
   uint32_t seed = 1;
-  uint32_t Nnodes = 9;
+  uint32_t Nnodes = 11;
   uint32_t RestartTimeout = 2000;
   uint32_t PacketIntervalCh = 10;
   uint32_t CycelIntervalCh = 20;
@@ -376,7 +376,7 @@ main (int argc, char *argv[])
     clientAppTMC->SetRemote (Mac48Address::ConvertFrom (nodes.Get(Nnodes - 1)->GetDevice(0)->GetAddress()) );
 
     clientAppTMC->SetMaxPackets (2147483648);
-    clientAppTMC->SetInterval (Seconds(5)); //5s
+    clientAppTMC->SetInterval (Seconds(300)); //5s
     clientAppTMC->SetPacketSize (5000); //5k
     clientAppTMC->SetQos (3);
     clientAppTMC->SetConstantRate (true);
@@ -398,7 +398,7 @@ main (int argc, char *argv[])
         clientAppNoAlter->SetRemote (Mac48Address::ConvertFrom (nodes.Get(Nnodes - 1)->GetDevice(0)->GetAddress()) );
         
         clientAppNoAlter->SetMaxPackets (2147483648);
-        clientAppNoAlter->SetInterval (Seconds(2)); //1
+        clientAppNoAlter->SetInterval (Seconds(3)); //1
         clientAppNoAlter->SetPacketSize (30000); //30k
         clientAppNoAlter->SetQos (1);
         clientAppNoAlter->SetConstantRate (true);
