@@ -750,11 +750,15 @@ private:
    
       typedef void (* ARQTxPacketCallback)
     (const Mac48Address addr, const Mac48Address to, const uint32_t packetid,const uint32_t qos, const uint32_t retrans, const bool success);
+      
+       typedef void (* m_ForwardQueueCallback)
+    (const uint32_t txus, const Mac48Address addr, const uint32_t qos, const uint32_t len);
      
     TracedCallback<Mac48Address, Time, uint32_t, uint32_t > m_channelSelected;
     TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t, uint32_t > m_recPacketTrace;
     TracedCallback<Mac48Address, Mac48Address, Ptr<Packet>, Time, uint32_t, uint32_t, uint32_t > m_ARQrecPacketTrace; 
     TracedCallback<Mac48Address, Mac48Address, uint32_t, uint32_t, uint32_t, bool > m_ARQTxPacketTrace;
+    TracedCallback<uint32_t, Mac48Address, uint32_t, uint32_t> m_ForwardQueueTrace;
     
     
     
@@ -804,6 +808,7 @@ private:
     uint32_t BUFFERSIZE;
     
     Ptr<UniformRandomVariable> m_random;  //!< Provides uniform random variables.
+    uint32_t m_InterfaceNum;
 
 };
 

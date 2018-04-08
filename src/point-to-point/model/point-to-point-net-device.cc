@@ -130,6 +130,10 @@ PointToPointNetDevice::GetTypeId (void)
                    UintegerValue (100),
                    MakeUintegerAccessor (&PointToPointNetDevice::BUFFERSIZE),
                    MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("m_InterfaceNum", "Total interface number, used for predefined topology",
+                   UintegerValue (22),
+                   MakeUintegerAccessor (&PointToPointNetDevice::m_InterfaceNum),
+                   MakeUintegerChecker<uint32_t> ())
     //
     // Transmit queueing discipline for the device which includes its own set
     // of trace hooks.
@@ -293,7 +297,12 @@ PointToPointNetDevice::GetTypeId (void)
                     "The header of successfully transmitted packet",
                     MakeTraceSourceAccessor (&PointToPointNetDevice::m_ARQTxPacketTrace),
                     "ns3::PointToPointNetDevice::ARQTxPacketCallback")
-  ;
+   .AddTraceSource ("ForwardQueueTrace",
+                    "Channel has been successfully Selected"
+                    "The header of successfully transmitted packet",
+                    MakeTraceSourceAccessor (&PointToPointNetDevice::m_ForwardQueueTrace),
+                    "ns3::PointToPointNetDevice::m_ForwardQueueCallback")
+  ; 
   return tid;
 }
 
@@ -1638,7 +1647,7 @@ PointToPointNetDevice::ReceiveFromGES (Ptr<Packet> packet)
       return;  
   }
       
-  NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive ......size "  <<  packet->GetSize() );
+  NS_LOG_UNCOND (Simulator::Now() << "\t" << GetAddress () << " receive from GES......size "  <<  packet->GetSize() );
   NS_LOG_FUNCTION (this << packet);
   uint16_t protocol = 0;
 
@@ -1694,7 +1703,7 @@ PointToPointNetDevice::ReceiveFromGES (Ptr<Packet> packet)
       ProcessHeader (packet, protocol);
       
          
-       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", ReceiveFromGES myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol << ", id " << ppp.GetID () );
+       NS_LOG_UNCOND(Simulator::Now() << "\t" << ", ReceiveFromGES myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size GES "  <<  packet->GetSize() << ",  protocol " << protocol << ", id " << ppp.GetID () );
 
      if (ppp.GetSourceAddre () == Mac48Address::ConvertFrom (GetAddress() ))
       {
@@ -1724,7 +1733,7 @@ PointToPointNetDevice::ReceiveFromGES (Ptr<Packet> packet)
       }
       //NS_LOG_DEBUG ( GetAddress () << "\t" << m_address );
 
-      NS_LOG_UNCOND(Simulator::Now() << "\t" << ", 2 myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size "  <<  packet->GetSize() << ",  protocol " << protocol );
+      NS_LOG_UNCOND(Simulator::Now() << "\t" << ", 2 myaddress" << GetAddress () << ", packet src "  <<ppp.GetSourceAddre() << "\t" << ppp.GetDestAddre ()  << " receive ......size  GES"  <<  packet->GetSize() << ",  protocol " << protocol );
  
       if (m_channel->IsChannelUni () )
       {          
@@ -2041,9 +2050,9 @@ PointToPointNetDevice::InitializeTopology ()
   }
   else
   {
-    for (uint16_t kk=0; kk < V; kk++) //only for bi
+    for (uint16_t kk=0; kk < m_InterfaceNum; kk++) //only for bi
     {
-      for (uint16_t ii=0; ii < V; ii++)
+      for (uint16_t ii=0; ii < m_InterfaceNum; ii++)
       {
           if (kk == ii)
           {
@@ -2061,7 +2070,7 @@ PointToPointNetDevice::InitializeTopology ()
             Topology[kk][ii] = 1; 
             Topology[ii][kk] = 1; 
           }
-         else if (kk==V-1 && ii==0)
+         else if (kk == m_InterfaceNum-1 && ii==0)
          {
             Topology[kk][ii] = 0;  
             Topology[ii][kk] = 0;  
@@ -3223,7 +3232,7 @@ unicast:
           uint8_t aid_h = mac[4] & 0x1f;
           uint16_t aid = (aid_h << 8) | (aid_l << 0); 
           
-          NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << " my address:" << GetAddress()  <<  " --route to " << nextHop << ", packet " << packet->GetSize() << ", protocolNumber " << protocolNumber);
+          NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << " my address:" << GetAddress()  <<  " send--route to " << nextHop << ", packet " << packet->GetSize() << ", protocolNumber " << protocolNumber);
            
           if (nextHop == aid - 1 )
             {
@@ -3273,6 +3282,10 @@ PointToPointNetDevice::EnqueueForward (Ptr<Packet> packet)
    if ( ppp.GetType () == DATATYPE || ppp.GetType () == DATAACK || ppp.GetType () == N_ACK )
     {
        IsQueued = m_queueForward.find (ppp.GetQos ())->second->Enqueue (packet);
+       uint32_t queueLen = m_queueForward.find (ppp.GetQos ())->second->GetNPackets ();
+       uint32_t qos = ppp.GetQos ();
+       uint32_t queueTx = Simulator::Now().GetMicroSeconds ();
+       m_ForwardQueueTrace ( queueTx, Mac48Address::ConvertFrom(GetAddress ()), qos, queueLen );
        //NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () <<" forwardqueue enqueue m_Qos " << uint16_t(ppp.GetQos ()) << ", original id " << ppp.GetID () << ", size " << packet->GetSize ());
     }
    else
@@ -4073,12 +4086,45 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
          //return;
       }
     else
-      {
+      { 
         NS_FATAL_ERROR  ("should not happen");
       }
    }
   
    ARQAckTimeout (buffer);
+   
+   if (!m_channel->IsChannelUni ())
+    {
+      PppHeader ppp; 
+      Ptr<const Packet>  packetPeek = PeekqueueForward ();
+      if (packetPeek != 0)
+       {
+          packetPeek->PeekHeader (ppp);
+          uint16_t nextHop = LookupRoutingTable (ppp.GetDestAddre());
+          Mac48Address addr = Mac48Address::ConvertFrom(m_DevSameNode->GetAddress ());
+          uint8_t mac[6];
+          addr.CopyTo (mac);
+          uint8_t aid_l = mac[5];
+          uint8_t aid_h = mac[4] & 0x1f;
+          uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+          
+          if (nextHop == aid - 1 )
+            {
+              Ptr<Packet> packetforward = DequeueForward ();
+              m_DevSameNode->Forward (packetforward, PACKETREPEATNUMBER-1); 
+           //return true;
+           //return m_DevSameNode->Froward (packet, dest, protocolNumber, true);
+           //return m_DevSameNode->SendFromInside (packet, dest, protocolNumber, true);
+            }
+          else
+            {
+              goto LinkedDevice;
+            }
+          return;
+        }
+    }
+  
+LinkedDevice:
    if (m_txMachineState == READY)
    {
          Ptr<Packet> packetforward = DequeueForward ();
@@ -4087,6 +4133,14 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
           TransmitStart (packetforward);
          }
    }
+
+
+   
+   
+
+
+ 
+
     
    /*
     std::list<uint32_t >::const_iterator PacketStatusiterator = buffer->m_listPacketStatus->begin ();
@@ -4347,7 +4401,7 @@ unicast:
           uint8_t aid_h = mac[4] & 0x1f;
           uint16_t aid = (aid_h << 8) | (aid_l << 0); 
           
-          NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << " my address:" << GetAddress()  <<  " --route to " << nextHop << ", packet " << packet->GetSize() << ", protocolNumber " << protocolNumber);
+          NS_LOG_UNCOND(Simulator::Now() << ", dst: " << dest << " my address:" << GetAddress()  <<  " ack--route to " << nextHop << ", packet " << packet->GetSize() << ", protocolNumber " << protocolNumber);
            
           if (nextHop == aid - 1 )
             {

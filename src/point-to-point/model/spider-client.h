@@ -88,6 +88,10 @@ public:
   virtual void SetPoissonRate (double rate);
   virtual double nextTime(double rateParameter);
   virtual void SetOutputpath (std::string path);
+  
+  virtual void SetBurstType (bool burst);
+  virtual void SetBurstNum (uint32_t num);
+
 
 
 
@@ -117,6 +121,8 @@ private:
   bool m_constantRate;
   double m_poissonRate; //in the unit of seconds
   uint32_t chunksize;
+  bool m_IsBurstType;
+  uint32_t m_burstNum;
   std::string m_Outputpath;
   
   std::ofstream myfile;

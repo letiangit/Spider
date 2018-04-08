@@ -91,8 +91,10 @@ SpiderClient::SpiderClient ()
   m_size = 1024;
   m_Qos = 3;
   m_constantRate = true;
+  m_IsBurstType = false;
   m_poissonRate = 1.0;
   chunksize = 1327;
+  m_burstNum = 1;
 }
 
 SpiderClient::~SpiderClient ()
@@ -143,6 +145,20 @@ SpiderClient::SetConstantRate (bool constant)
   NS_LOG_FUNCTION (this << constant);
   m_constantRate = constant;
 }
+
+void
+SpiderClient::SetBurstType (bool burst)
+{
+    m_IsBurstType = burst;
+}
+
+void
+SpiderClient::SetBurstNum (uint32_t num)
+{
+    m_burstNum = num;
+}
+
+
 
 void
 SpiderClient::SetOutputpath (std::string path)
@@ -220,22 +236,28 @@ SpiderClient::Send (void)
   
 
   uint32_t fragementnumber = std::ceil(m_size/chunksize) + 1; //ceil
+  if (!m_IsBurstType)
+      m_burstNum = 1;
   
-  for (uint32_t kk = 0; kk < fragementnumber; kk++)
-  {
-      Ptr<Packet> p = Create<Packet> (chunksize); 
-      m_Device->Send (p, m_peerAddress, 2048+m_Qos);
-      NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize );
-      std::string dropfile=m_Outputpath;
-      myfile.open (dropfile, ios::out | ios::app);
-      //myfile <<  Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize << "\n";
-      myfile.close();
-  }
+    for (uint32_t i = 0; i < m_burstNum; i++)  
+    {
+    for (uint32_t kk = 0; kk < fragementnumber; kk++)
+        {
+            Ptr<Packet> p = Create<Packet> (chunksize); 
+            m_Device->Send (p, m_peerAddress, 2048+m_Qos);
+            NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize );
+            //std::string dropfile=m_Outputpath;
+            //myfile.open (dropfile, ios::out | ios::app);
+            //myfile <<  Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize << "\n";
+            //myfile.close();
+        }
+    }
+  
   
     if (m_sent < m_count)
     {
       ++m_sent;
-      if (m_constantRate)
+      if (m_constantRate || m_IsBurstType)
       {
            m_sendEvent = Simulator::Schedule (m_interval, &SpiderClient::Send, this);
            NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " client sent packet to " << m_peerAddress << " m_sent " << m_sent << "  size " << m_size );

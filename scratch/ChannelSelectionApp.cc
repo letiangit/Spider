@@ -191,6 +191,7 @@ main (int argc, char *argv[])
   uint32_t  ARQTimeout = 500;
   uint32_t  ARQBufferSize = 7;
   uint32_t  PoissonRate = 33;
+  uint32_t  m_InterfaceNum;
 
   
   CommandLine cmd;
@@ -232,6 +233,7 @@ main (int argc, char *argv[])
     {
         return Nnodes;
     }
+  m_InterfaceNum = Nnodes * 2;
     
   if (NominalMode)
     {
@@ -264,6 +266,7 @@ main (int argc, char *argv[])
   pointToPoint.SetDeviceAttribute ("Outputpath", StringValue (Outputpath));
   pointToPoint.SetDeviceAttribute ("ARQAckTimeout", TimeValue (MilliSeconds(ARQTimeout))); //in the unit of seconds
   pointToPoint.SetDeviceAttribute ("ARQBufferSize", UintegerValue (ARQBufferSize) ); //in the unit of ms
+  pointToPoint.SetDeviceAttribute ("m_InterfaceNum", UintegerValue (m_InterfaceNum) ); //in the unit of ms
 
 
     
