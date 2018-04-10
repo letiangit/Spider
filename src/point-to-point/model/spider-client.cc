@@ -93,7 +93,7 @@ SpiderClient::SpiderClient ()
   m_constantRate = true;
   m_IsBurstType = false;
   m_poissonRate = 1.0;
-  chunksize = 1327;
+  chunksize = 1314;
   m_burstNum = 1;
 }
 
@@ -235,7 +235,7 @@ SpiderClient::Send (void)
   NS_ASSERT (m_sendEvent.IsExpired ());
   
 
-  uint32_t fragementnumber = std::ceil(m_size/chunksize) + 1; //ceil
+  uint32_t fragementnumber = std::ceil(m_size/ (1.0 * chunksize)); //ceil
   if (!m_IsBurstType)
       m_burstNum = 1;
   
@@ -244,6 +244,7 @@ SpiderClient::Send (void)
     for (uint32_t kk = 0; kk < fragementnumber; kk++)
         {
             Ptr<Packet> p = Create<Packet> (chunksize); 
+			cout << "GEN\t" << Simulator::Now() << "\t" << m_Device->GetAddress () << "\t" << m_peerAddress << "\t" << chunksize << "\t" << m_Qos << endl;
             m_Device->Send (p, m_peerAddress, 2048+m_Qos);
             NS_LOG_INFO (Simulator::Now () << ", " << m_Device->GetAddress () << " client sent chunks to " << m_peerAddress  << " chunksize  " << chunksize );
             //std::string dropfile=m_Outputpath;

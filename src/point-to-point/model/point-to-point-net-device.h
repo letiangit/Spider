@@ -330,6 +330,7 @@ bool SendAck (const Address &dest, uint16_t protocolNumber, uint32_t packetid, u
   void  EnqueueForward (Ptr<Packet> packet);
   Ptr<Packet>  DequeueForward (void);
   Ptr<const Packet> PeekqueueForward (void);
+  void TransmitStartTwoInterface (Ptr<Packet> packet);
 
 
     

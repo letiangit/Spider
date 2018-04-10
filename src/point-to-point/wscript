@@ -13,6 +13,7 @@ def build(bld):
         'model/spf.cc',
         'model/spider-client.cc',
         'model/spider-server.cc',
+        'model/bulk-image-client.cc',
         'helper/point-to-point-helper.cc',
         ]
 
@@ -33,6 +34,7 @@ def build(bld):
         'model/spf.h',
         'model/spider-client.h',
         'model/spider-server.h',
+        'model/bulk-image-client.h',
         'helper/point-to-point-helper.h',
         ]
 
