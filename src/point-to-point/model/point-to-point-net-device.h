@@ -810,7 +810,10 @@ private:
     
     Ptr<UniformRandomVariable> m_random;  //!< Provides uniform random variables.
     uint32_t m_InterfaceNum;
-
+    
+    bool m_loadBalance;
+    bool m_src;
+    bool m_interface;
 };
 
 
