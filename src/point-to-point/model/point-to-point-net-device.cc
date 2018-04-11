@@ -728,6 +728,66 @@ PointToPointNetDevice::TransmitComplete (void)
    }
 }
 
+bool
+PointToPointNetDevice::ForwardDown (void)
+{
+   PppHeader ppp;
+   if (!m_channel->IsChannelUni ())
+    {
+      Ptr<const Packet>  packetPeek = PeekqueueForward ();
+      if (packetPeek != 0)
+       {
+          packetPeek->PeekHeader (ppp);
+          uint16_t nextHop = LookupRoutingTable (ppp.GetDestAddre());
+          Mac48Address addr = Mac48Address::ConvertFrom(m_DevSameNode->GetAddress ());
+          uint8_t mac[6];
+          addr.CopyTo (mac);
+          uint8_t aid_l = mac[5];
+          uint8_t aid_h = mac[4] & 0x1f;
+          uint16_t aid = (aid_h << 8) | (aid_l << 0); 
+          
+          //NS_LOG_DEBUG(Simulator::Now() << ", dst: " << dest << " my address:" << GetAddress()  <<  " send--route to " << nextHop << ", packet " << packet->GetSize() << ", protocolNumber " << protocolNumber);
+           
+          if (nextHop == aid - 1 )
+            {
+              //Ptr<Packet> packetsend = DequeueForward ();
+              //NS_LOG_DEBUG(dest << "\t" << GetAddress()  <<  " route to  neighbour " );
+             // m_DevSameNode->Forward (packetsend, PACKETREPEATNUMBER-1); 
+             goto LinkedDevice;
+              //return true;
+           //return true;
+           //return m_DevSameNode->Froward (packet, dest, protocolNumber, true);
+           //return m_DevSameNode->SendFromInside (packet, dest, protocolNumber, true);
+            }
+          else
+            {
+              goto LinkedDevice;
+            }
+        }
+  }
+      
+ 
+     LinkedDevice:
+      if (m_txMachineState == READY)
+        {
+          Ptr<Packet>  packetsend =  DequeueForward ();
+          if (packetsend == 0)
+            {
+              return false;
+            }
+          
+          packetsend->PeekHeader (ppp);
+          NS_LOG_DEBUG (GetAddress () <<" send m_Qos " << uint16_t(ppp.GetQos ()) << ", id " << ppp.GetID ());
+
+          m_snifferTrace (packetsend);
+          m_promiscSnifferTrace (packetsend);
+          
+          return TransmitStart (packetsend);
+        }
+     return false; 
+    
+}
+
 void
 PointToPointNetDevice::TransmitStartTwoInterface (Ptr<Packet> packet)
 {
@@ -3144,17 +3204,15 @@ PointToPointNetDevice::Forward (Ptr<Packet> packet, uint16_t counter)
    if (ppp.GetType() == DATATYPE || ppp.GetType() == DATAACK)
      {
        //NS_LOG_DEBUG(Simulator::Now() << "\t" << GetAddress () <<  "  Forward packet "); 
+       ForwardDown ();
+       return;
      }
         
       if (m_txMachineState == READY)
        {
-                 //NS_LOG_DEBUG(Simulator::Now() << "\t" << GetAddress () <<  "  Forward packet ready "); 
-
          Ptr<Packet> packetforward = DequeueForward ();
          if (packetforward !=0)
          {
-                              //NS_LOG_DEBUG(Simulator::Now() << "\t" << GetAddress () <<  "  Forward packet not 0 "); 
-
           TransmitStart (packetforward);
          }
        }
@@ -3340,7 +3398,7 @@ unicast:
   
   
 //  
- 
+  /*
   if (!m_channel->IsChannelUni ())
   {
       Ptr<const Packet>  packetPeek = PeekqueueForward ();
@@ -3393,8 +3451,8 @@ unicast:
           
           return TransmitStart (packetsend);
         }
-
-  return false;
+   */ 
+  return ForwardDown ();
 }
 
 void
@@ -3498,6 +3556,8 @@ PointToPointNetDevice::PreparePacketToSend ()
       packetkPeek = m_queueMap.find (qos-1)->second->Peek ();
       if (packetkPeek != 0)
        {    
+            //return m_queueMap.find (qos-1)->second->Dequeue ();
+
             queueEmpyt = false;
             PppHeader ppp;
 
@@ -4130,7 +4190,7 @@ PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer)
         TxTimeiterator++;
      }
    }
-    
+    /*
       if (!m_channel->IsChannelUni ())
     {
       PppHeader ppp; 
@@ -4174,6 +4234,8 @@ LinkedDevice:
           TransmitStart (packetforward);
          }
    }
+   */
+    ForwardDown ();
     ARQAckTimeoutEvent = Simulator::Schedule(ARQAckTimer, &PointToPointNetDevice::ARQAckTimeout, this, buffer );
     //NS_ASSERT (packetInbuffer);
 } 
@@ -4516,7 +4578,7 @@ unicast:
 
   EnqueueForward (PacketForwardtest);
   //m_queueForward.find (m_Qos)->second->Enqueue (packet);
-  
+  /*
  if (!m_channel->IsChannelUni ())
   {
       Ptr<const Packet>  packetPeek = PeekqueueForward ();
@@ -4562,8 +4624,9 @@ LinkedDevice:
            }
           return TransmitStart (packetforward);
         }
+  */
 
-  return false;
+  return ForwardDown ();
 }
 
 
