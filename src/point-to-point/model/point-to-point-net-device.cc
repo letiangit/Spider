@@ -624,7 +624,26 @@ PointToPointNetDevice::TransmitStart (Ptr<Packet> p)
   
     //m_loadBalance = true;
     if (m_loadBalance && m_src && !m_channel->IsChannelUni ())
-     {
+     {  
+        if  ( m_GESSameNodeFlag && ppp.GetDestAddre() ==  m_GESSameNode->m_dstGESAddr )
+        {
+          //NS_LOG_UNCOND(GetAddress() << "  sent to GES " <<  " \t " << m_GESSameNode->m_dstGESAddr  );
+          //NS_LOG_UNCOND("GESD \t" << Mac48Address::ConvertFrom(GetAddress ()) << "\t"  << ppp.GetSourceAddre()  << "\t" << ppp.GetDestAddre() << "\t"  << ppp.GetID () << "\t" << p->GetSize()  << "\t"  <<  Simulator::Now().GetMilliSeconds()  );
+
+          m_GESSameNode->Forward (p);
+          m_interface = true;   
+          Simulator::Schedule (Seconds(0), &PointToPointNetDevice::TransmitComplete, this);
+          return true;
+        }
+      else if ( !m_channel->IsChannelUni () && !m_GESSameNodeFlag && ppp.GetDestAddre() ==  m_DevSameNode->m_GESSameNode->m_dstGESAddr )
+        {
+          //NS_LOG_UNCOND(GetAddress() << "  sent to neighbour's GES " <<  " \t " << m_DevSameNode->m_GESSameNode->m_dstGESAddr  );
+          //NS_LOG_UNCOND("GESI \t" << Mac48Address::ConvertFrom(GetAddress ()) << "\t"  << ppp.GetSourceAddre()  << "\t" << ppp.GetDestAddre() << "\t"  << ppp.GetID () << "\t" << p->GetSize()  << "\t"  <<  Simulator::Now().GetMilliSeconds()  );
+          m_DevSameNode->m_GESSameNode->Forward (p);
+          m_interface = true;   
+          Simulator::Schedule (Seconds(0), &PointToPointNetDevice::TransmitComplete, this);
+          return true;
+        }
         if (m_interface)
          {
               //EnqueueForward (PacketForwardtest);   
@@ -2578,7 +2597,8 @@ PointToPointNetDevice::LEOInitLinkDst (std::map<uint32_t, Ptr<PointToPointNetDev
       for (uint16_t ii=0; ii < V; ii++)
       {
             Topology[kk][ii]=9999;
-            m_DevSameNode->Topology[kk][ii]=9999;
+            if (!m_channel->IsChannelUni ()) 
+              m_DevSameNode->Topology[kk][ii]=9999;
       }   
   }   
      LEOupdateLinkDst ();  
@@ -3582,7 +3602,7 @@ unicast:
  // NS_LOG_DEBUG ("send data m_Qos " << uint16_t(m_Qos));
   m_queueMap.find (m_Qos)->second->Enqueue (packet); //uppper layer queue
   
-   //NS_LOG_UNCOND(Simulator::Now() << "\t" << GetAddress () << " send packet size  " << packet->GetSize()  << " original id " << ppp.GetID () <<  "  qos " << uint16_t(m_Qos));
+   NS_LOG_UNCOND(Simulator::Now() << "\t" << GetAddress () << " send packet size  " << packet->GetSize()  << " original id " << ppp.GetID () <<  "  qos " << uint16_t(m_Qos));
  
   
 
@@ -4651,7 +4671,7 @@ PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Packet>
     packet->PeekHeader (ppp);
     Time txTime = Seconds (0);
     
-    //NS_LOG_UNCOND(GetAddress () << " original id  " << ppp.GetID()  << " new id " << ARQ_Packetid);
+    NS_LOG_UNCOND(GetAddress () << " original id  " << ppp.GetID()  << " new id " << ARQ_Packetid);
         
     uint16_t protocol = 0;
      ProcessHeader (packet, protocol);//t0 do

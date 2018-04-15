@@ -40,7 +40,8 @@ PointToPointChannelGES::GetTypeId (void)
     .SetGroupName ("PointToPoint")
     .AddConstructor<PointToPointChannelGES> ()
     .AddAttribute ("Delay", "Transmission delay through the channel",
-                   TimeValue (MicroSeconds (14400)),
+                   TimeValue (MicroSeconds (2000)),
+                   //TimeValue (MicroSeconds (14400)),
                    MakeTimeAccessor (&PointToPointChannelGES::m_delay),
                    MakeTimeChecker ())
     .AddTraceSource ("TxRxPointToPoint",

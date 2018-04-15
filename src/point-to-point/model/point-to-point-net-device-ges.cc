@@ -56,8 +56,8 @@ PointToPointNetDeviceGES::GetTypeId (void)
                    MakeMac48AddressChecker ())
     .AddAttribute ("DataRate", 
                    "The default data rate for point to point links",
-                   //DataRateValue (DataRate ("32768b/s")),
-                   DataRateValue (DataRate ("1300000b/s")),
+                   //DataRateValue (DataRate ("1300000b/s")),
+                   DataRateValue (DataRate ("100000000b/s")),
                    MakeDataRateAccessor (&PointToPointNetDeviceGES::m_bps),
                    MakeDataRateChecker ())
     .AddAttribute ("ReceiveErrorModel", 
@@ -72,11 +72,11 @@ PointToPointNetDeviceGES::GetTypeId (void)
                    MakeTimeChecker ())
       .AddAttribute ("ARQAckTimeout", 
                    "The time interval for sending packets during channel selection",
-                   TimeValue (Seconds (10.0)),
+                   TimeValue (Seconds (1.0)),
                    MakeTimeAccessor (&PointToPointNetDeviceGES::ARQAckTimer),
                    MakeTimeChecker ()) 
     .AddAttribute ("ARQBufferSize", "The MAC-level Maximum Transmission Unit",
-                   UintegerValue (100),
+                   UintegerValue (31),
                    MakeUintegerAccessor (&PointToPointNetDeviceGES::BUFFERSIZE),
                    MakeUintegerChecker<uint32_t> ())
 
