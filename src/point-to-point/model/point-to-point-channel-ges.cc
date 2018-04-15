@@ -40,7 +40,7 @@ PointToPointChannelGES::GetTypeId (void)
     .SetGroupName ("PointToPoint")
     .AddConstructor<PointToPointChannelGES> ()
     .AddAttribute ("Delay", "Transmission delay through the channel",
-                   TimeValue (Seconds (0)),
+                   TimeValue (MicroSeconds (14400)),
                    MakeTimeAccessor (&PointToPointChannelGES::m_delay),
                    MakeTimeChecker ())
     .AddTraceSource ("TxRxPointToPoint",
@@ -140,7 +140,7 @@ PointToPointChannelGES::TransmitStart (
 
   for ( it=m_deviceList.begin(); it!=m_deviceList.end(); ++it)
   {      
-       NS_LOG_UNCOND (" m_deviceList " << (*it)->GetAddress ());
+      // NS_LOG_UNCOND (" m_deviceList " << (*it)->GetAddress ());
 
          
       if ( Mac48Address::ConvertFrom ((*it)->GetAddress ()) == dst)
@@ -149,7 +149,7 @@ PointToPointChannelGES::TransmitStart (
            break;
       }  
   }
-   NS_LOG_UNCOND ("b " << b << ", src " << src->GetAddress () << ", dst " << dst);
+   //NS_LOG_UNCOND ("b " << b << ", src " << src->GetAddress () << ", dst " << dst);
    NS_ASSERT (b != N_DEVICES);
 
   

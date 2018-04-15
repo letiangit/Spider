@@ -111,7 +111,7 @@ public:
     //#define PACKETREPEATNUMBER 4
     
     //#define V 22
-    #define V 22 //two GES station
+    #define V 35 //two GES station
     #define TTLmax 24 //two GES station
 
     //#define BUFFERSIZE 100 //should be changed to be configurable
@@ -287,7 +287,7 @@ public:
   
   void UpdateTopologyGES ();
   
-  void LEOInitLinkDst (uint32_t position, uint32_t InitPosGES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumGES, uint32_t NumLEO, Time interval);
+  void LEOInitLinkDst (std::map<uint32_t, Ptr<PointToPointNetDevice> > m_nodeDeviceMap, uint32_t position, uint32_t InitPosGES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumGES, uint32_t NumLEO, Time interval);
   void LEOupdateLinkDst ();
   
 
@@ -357,6 +357,8 @@ bool SendAck (const Address &dest, uint16_t protocolNumber, uint32_t packetid, u
 
   virtual bool SupportsSendFrom (void) const;
   virtual void  Cancel4Events ();
+  
+  uint32_t Topology[V][V];
 
 protected:
   /**
@@ -767,7 +769,7 @@ private:
     
     
     
-    uint32_t Topology[V][V];
+    //uint32_t Topology[V][V];
     ShortPath  * CalPath;
     uint32_t * tablePoint;
     uint8_t m_Qos;
@@ -787,6 +789,8 @@ private:
   bool m_TopoInitialized;
   
   EventId LEOupdateLinkDstEvent;
+  
+  std::map<uint32_t, Ptr<PointToPointNetDevice> > m_nodeDeviceMap;
   
   
    std::list< Mac48Address > RemoteAddressList;

@@ -31,6 +31,7 @@
 #include "ns3/ptr.h"
 #include "ns3/mac48-address.h"
 #include "point-to-point-net-device.h"
+#include "ns3/random-variable-stream.h"
 
 
 #include <map>
@@ -42,6 +43,12 @@ class PointToPointChannelGES;
 class PointToPointNetDevice;
 
 class ErrorModel;
+
+ struct RemoteSatelliteARQBuffer;
+ struct RemoteSatellite;
+ 
+ struct RemoteSatelliteTx;
+ struct RemoteSatelliteARQBufferTx;
 
 /**
  * \defgroup point-to-point Point-To-Point Network Device
@@ -125,6 +132,8 @@ public:
    * \param queue Ptr to the new queue.
    */
   void SetQueue (Ptr<Queue> queue);
+  void SetQueue (Ptr<Queue> q, Ptr<Queue> queueCritical, Ptr<Queue> queuehighPri, Ptr<Queue> queueBestEff, Ptr<Queue> queueBackGround, Ptr<Queue> queueForward, Ptr<Queue> queueCriticalForward, Ptr<Queue> queuehighPriForward, Ptr<Queue> queueBestEffForward, Ptr<Queue> queueBackGroundForward);
+
 
   /**
    * Get a copy of the attached Queue.
@@ -216,10 +225,47 @@ public:
   
   //attach to LEO
   void LEOInitLinkDst (uint32_t position, uint32_t InitPosLES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumGES,uint32_t NumLEO, Time interval);
+  void LEOInitLinkDstAll (Mac48Address addr, uint32_t position, uint32_t InitPosLES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumGES,uint32_t NumLEO, Time interval);
+
   void LEOupdateLinkDst (void);
+  void LEOupdateLinkDstAll (void);
   
+  
+  void  EnqueueForward (Ptr<Packet> packet);
+  Ptr<Packet>  DequeueForward (void);
+  bool ForwardDown (void);
+  
+  virtual Ptr<Packet> PreparePacketToSend (void);
+  //virtual void setNextHop1 (Mac48Address addr);
+  
+  
+void ARQReceive (Mac48Address src, Mac48Address dst, Time rece, uint32_t size , uint32_t protocol,  uint32_t packetid, Ptr<Packet> packet);
+RemoteSatellite* ARQLookup (Mac48Address src, Time rece, uint32_t size , uint32_t protocol, uint32_t packetid)  const;
+void CheckAvailablePacket (RemoteSatelliteARQBuffer * buffer, Mac48Address);
+
+RemoteSatelliteTx* ARQLookupTx (Mac48Address dst, uint32_t packetid)  const;
+Ptr<Packet> ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Packet> packet);
+Ptr<Packet> ARQSend (RemoteSatelliteARQBufferTx * buffer);
+
+void ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer);
 
 
+void ARQACKRecevie (Mac48Address dst, uint32_t packetid);
+void ARQN_ACKRecevie (Mac48Address dst, uint32_t packetid); 
+
+bool ARQTxBufferCheck (RemoteSatelliteARQBufferTx * buffer) const;
+bool ARQRxBufferCheck (RemoteSatelliteARQBuffer * buffer) const;
+
+
+
+
+
+bool SendAck (const Address &dest, uint16_t protocolNumber, uint32_t packetid, uint32_t ackType, uint32_t qos);
+
+  Mac48Address m_dstLEOAddr;
+  Mac48Address m_dstGESAddr;
+  
+  Mac48Address m_LEOdstGESAddr;
 
 protected:
   /**
@@ -503,12 +549,36 @@ private:
    * \return The corresponding PPP protocol number
    */
   static uint16_t EtherToPpp (uint16_t protocol);
+  typedef std::map<uint8_t, Ptr<Queue> > Queues;
+  Queues m_queueMap;
+  Ptr<Queue> m_queueQos3;
+  Ptr<Queue> m_queueQos2;
+  Ptr<Queue> m_queueQos1;
+  Ptr<Queue> m_queueQos0;
+  
+  Queues m_queueForward;
+  Ptr<Queue> m_queueForwardQos4;
+  Ptr<Queue> m_queueForwardQos3;
+  Ptr<Queue> m_queueForwardQos2;
+  Ptr<Queue> m_queueForwardQos1;
+  Ptr<Queue> m_queueForwardQos0;
   
    typedef void (* RecPacketCallback)
     (const Mac48Address addr, const Mac48Address from, const Mac48Address to, const Time ts, const uint32_t rx,
-     const uint32_t tx);
+     const uint32_t tx,  const Mac48Address linkto);
+   
+     typedef void (* ARQRecPacketCallback)
+    (const Mac48Address addr, const Mac48Address from, const Ptr<Packet> packet, const Time rx, const uint32_t size,
+     const uint32_t qos, const uint32_t packetid);
+   
+   
+      typedef void (* ARQTxPacketCallback)
+    (const Mac48Address addr, const Mac48Address to, const uint32_t packetid,const uint32_t qos, const uint32_t retrans, const bool success);
   
-  TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t,  Mac48Address> m_recPacketTrace;
+  TracedCallback<Mac48Address, Mac48Address, Mac48Address, Time, uint32_t, uint32_t, Mac48Address > m_recPacketTrace;
+
+  TracedCallback<Mac48Address, Mac48Address, Ptr<Packet>, Time, uint32_t, uint32_t, uint32_t > m_ARQrecPacketTrace; 
+  TracedCallback<Mac48Address, Mac48Address, uint32_t, uint32_t, uint32_t, bool > m_ARQTxPacketTrace;
 
   
   Ptr<PointToPointNetDevice> m_DevSameNode0;
@@ -517,6 +587,9 @@ private:
   uint16_t m_type;
   uint8_t m_Qos;
   uint32_t m_packetId;
+  uint32_t m_ackid;
+  uint32_t m_respid;
+  uint32_t m_reqid;
   Mac48Address m_destAddress;
   
   
@@ -526,7 +599,6 @@ private:
   std::map<uint32_t, Mac48Address>  m_deviceMapPosition;
   uint32_t m_NumLEO;
   Time m_dstLEOinterval;
-  Mac48Address m_dstLEOAddr;
   
   //attach to LEO
   //uint32_t m_indicator;
@@ -536,18 +608,93 @@ private:
   //std::map<uint32_t, Mac48Address>  m_deviceMapPosition;
   uint32_t m_NumGES;
   Time m_dstGESinterval;
-  Mac48Address m_dstGESAddr;
   
+  std::map<Mac48Address, uint32_t>  m_LEOAddrMap;
+  std::map<Mac48Address, Mac48Address>  m_LEORouting;
+  uint32_t m_LEOcount;
+  uint32_t m_LEOindicator[9999];
+  uint32_t m_LEOinitPostion[9999];
+  uint32_t m_LEOlinkDst[99][99];
+
+
   
   
    EventId LEOupdateLinkDstEvent;
    EventId GESupdateLinkDstEvent;
 
 
+  
+    typedef std::vector <RemoteSatellite *> StatDevice;
+    StatDevice m_statDevice;
+    
+    typedef std::vector <RemoteSatelliteTx *> StatDeviceTx;
+    StatDeviceTx m_statDeviceTx;
+    
+    EventId ARQAckTimeoutEvent;
+    Time ARQAckTimer;
+    
+    uint32_t ARQ_Packetid;
+    
+    uint32_t BUFFERSIZE;
+    
+    Ptr<UniformRandomVariable> m_random;  //!< Provides uniform random variables.
 
 
 
 };
+
+
+/*
+struct RemoteSatelliteARQBuffer
+{
+   uint32_t m_bufferStart;
+   uint32_t m_bufferSize;
+   
+   uint32_t m_NACKNumStart;
+   
+   
+  //std::list<Ptr<PointToPointNetDeviceGES> >::iterator m_nodeGESIterator;
+  std::list<Ptr<Packet> > * m_listPacket;
+  std::list<Time > * m_listRecTime;
+  std::list<uint32_t > * m_listSize;
+  std::list<uint32_t > * m_listProtocol;
+  std::list<uint32_t > * m_listPacketId;
+  std::list<uint32_t > * m_listNAackNum; //NACKNUM2903
+
+  
+};
+    
+ struct RemoteSatellite
+ {
+  virtual ~RemoteSatellite ();
+  RemoteSatelliteARQBuffer *m_buffer;
+  uint32_t m_retryCount;                  //!< STA short retry count
+  Mac48Address m_remoteAddress;
+};
+
+
+
+struct RemoteSatelliteARQBufferTx
+{
+   uint32_t m_bufferStart;
+   uint32_t m_bufferSize;
+   
+   
+  std::list<Ptr<Packet> > * m_listPacket;
+  std::list<Time > * m_listTxTime;
+  std::list<uint32_t > * m_listPacketId;
+  std::list<uint32_t > * m_listPacketStatus;
+  std::list<uint32_t > * m_listPacketRetryNum; 
+};
+    
+ struct RemoteSatelliteTx
+ {
+  virtual ~RemoteSatelliteTx ();
+  RemoteSatelliteARQBufferTx *m_buffer;
+  uint32_t m_retryCount;                  //!< STA short retry count
+  Mac48Address m_remoteAddress;
+};
+ */
 
 } // namespace ns3
 

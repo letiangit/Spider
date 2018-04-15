@@ -81,6 +81,7 @@ void
 PointToPointHelper::SetDeviceAttribute (std::string n1, const AttributeValue &v1)
 {
   m_deviceFactory.Set (n1, v1);
+  //m_deviceGESFactory.Set (n1, v1);
 }
 
 void 
@@ -88,6 +89,7 @@ PointToPointHelper::SetChannelAttribute (std::string n1, const AttributeValue &v
 {
   m_channelFactory.Set (n1, v1);
   m_remoteChannelFactory.Set (n1, v1);
+  //m_channelGESFactory.Set (n1, v1);
 }
 
 void 
@@ -311,7 +313,7 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      devASecond->SetAddress (Mac48Address::Allocate ());
      a->AddDevice (devASecond);
      m_nodeDeviceMap[a->GetId ()] = devASecond;
-     std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
+     std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << "\t" << devASecond->GetAddress()  << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
@@ -337,7 +339,7 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      devAFirst->SetAddress (Mac48Address::Allocate ());
      a->AddDevice (devAFirst);
      m_nodeDeviceMap[a->GetId ()] = devAFirst;
-     std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << '\n';
+     std::cout << "node " << a->GetId () << " install device, number " << a->GetNDevices () << "\t" << devAFirst->GetAddress() << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
@@ -362,8 +364,8 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      devBSecond = m_deviceFactory.Create<PointToPointNetDevice> ();
      devBSecond->SetAddress (Mac48Address::Allocate ());
      b->AddDevice (devBSecond);
-     m_nodeDeviceMap[a->GetId ()] = devBSecond;
-     std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
+     m_nodeDeviceMap[b->GetId ()] = devBSecond;
+     std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << "\t" << devBSecond->GetAddress() << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
@@ -390,7 +392,7 @@ PointToPointHelper::InstallBi (Ptr<Node> a, Ptr<Node> b)
      devBFirst->SetAddress (Mac48Address::Allocate ());
      b->AddDevice (devBFirst);
      m_nodeDeviceMap[b->GetId ()] = devBFirst;
-     std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << '\n';
+     std::cout << "node " << b->GetId () << " install device, number " << b->GetNDevices () << "\t" << devBFirst->GetAddress() << '\n';
      Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
@@ -627,6 +629,10 @@ PointToPointHelper::InstallUni (Ptr<Node> a, Ptr<Node> b)
 }
 
 
+
+
+     
+     
 //happens after leo device is installed
 NetDeviceContainer
 PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
@@ -657,8 +663,22 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
       Ptr<PointToPointNetDeviceGES> devA = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
       m_nodeGESDeviceMap[a->GetId ()] = devA;
       devA->SetAddress (Mac48Address::Allocate ());
+      //Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
+      //devA->SetQueue (queueA);
+      
       Ptr<Queue> queueA = m_queueFactory.Create<Queue> ();
-      devA->SetQueue (queueA);
+      Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+      Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
+     
+       Ptr<Queue> queueForward = m_queueFactory.Create<Queue> ();
+       Ptr<Queue> queueCriticalForward = m_queueFactory.Create<Queue> ();
+       Ptr<Queue> queuehighPriForward = m_queueFactory.Create<Queue> ();
+       Ptr<Queue> queueBestEffForward = m_queueFactory.Create<Queue> ();
+       Ptr<Queue> queueBackGroundForward = m_queueFactory.Create<Queue> (); 
+       devA->SetQueue (queueA, queueCritical, queuehighPri, queueBestEff, queueBackGround, queueForward, queueCriticalForward, queuehighPriForward, queueBestEffForward, queueBackGroundForward);
+
   
       a->AddDevice (devA);
       
@@ -690,8 +710,24 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
       Ptr<PointToPointNetDeviceGES> devB = m_deviceGESFactory.Create<PointToPointNetDeviceGES> ();
       m_nodeGESDeviceMap[b->GetId ()] = devB;
       devB->SetAddress (Mac48Address::Allocate ());
+      //Ptr<Queue> queueB = m_queueFactory.Create<Queue> ();
+      //devB->SetQueue (queueB);
+      
       Ptr<Queue> queueB = m_queueFactory.Create<Queue> ();
-      devB->SetQueue (queueB);
+      Ptr<Queue> queueCritical = m_queueFactory.Create<Queue> ();
+      Ptr<Queue> queuehighPri = m_queueFactory.Create<Queue> ();
+      Ptr<Queue> queueBestEff = m_queueFactory.Create<Queue> ();
+      Ptr<Queue> queueBackGround = m_queueFactory.Create<Queue> ();
+     
+       Ptr<Queue> queueForward = m_queueFactory.Create<Queue> ();
+       Ptr<Queue> queueCriticalForward = m_queueFactory.Create<Queue> ();
+       Ptr<Queue> queuehighPriForward = m_queueFactory.Create<Queue> ();
+       Ptr<Queue> queueBestEffForward = m_queueFactory.Create<Queue> ();
+       Ptr<Queue> queueBackGroundForward = m_queueFactory.Create<Queue> (); 
+       devB->SetQueue (queueB, queueCritical, queuehighPri, queueBestEff, queueBackGround, queueForward, queueCriticalForward, queuehighPriForward, queueBestEffForward, queueBackGroundForward);
+      
+      
+      
       b->AddDevice (devB);
       NS_LOG_UNCOND (b->GetId () << " leo first add geo  " );
       
@@ -773,7 +809,8 @@ PointToPointHelper::InstallGES (Ptr<Node> a, Ptr<Node> b)
   
    //m_nodeGESIterator = m_nodeGESDeviceMap.find (b->GetId ())->Second;
 
-    
+  NS_LOG_UNCOND ( m_nodeGESDeviceMap.find (a->GetId ())->second << "\t" << m_nodeGESDeviceMap.find (b->GetId ())->second );
+   
   m_channelGES->Attach (m_nodeGESDeviceMap.find (a->GetId ())->second, m_nodeGESDeviceMap.find (b->GetId ())->second);
   //m_containerGES.Add (devA);
   //m_containerGES.Add (devB);
@@ -788,6 +825,16 @@ void
 PointToPointHelper::InitTopologyGES (uint32_t LEONUM, uint32_t GESNUM, uint32_t GESPos[], Time PosShiftInterval)
 {     
   NS_LOG_UNCOND (" InitTopologyGES ------------------------------------------------------------- ");
+   std::list< Ptr<Node> >::iterator cc;
+   for (cc = m_nodeList.begin(); cc != m_nodeList.end(); ++cc)
+    {
+      uint32_t nodeid = (*cc)->GetId ();
+      if (nodeid < LEONUM)
+      {
+        Ptr<PointToPointNetDevice> dev = m_nodeDeviceMap.find (nodeid)->second;
+        NS_LOG_UNCOND (" LEO_index " << nodeid << "\t" << Mac48Address::ConvertFrom(dev->GetAddress ()) );
+      }
+    }
   NS_ASSERT (LEONUM + GESNUM == m_nodeList.size ());
   uint32_t pos = 1;
   std::list< Ptr<Node> >::iterator it;
@@ -827,7 +874,7 @@ PointToPointHelper::InitTopologyGES (uint32_t LEONUM, uint32_t GESNUM, uint32_t 
       {
         Ptr<PointToPointNetDeviceGES> dev = m_nodeGESDeviceMap.find (nodeid)->second;
         //  LEO_index 
-        NS_LOG_UNCOND (" LEO_index " << LEO_index);
+        NS_LOG_UNCOND (" LEO_index " << LEO_index << "\t" << Mac48Address::ConvertFrom(dev->GetAddress ()));
         NS_LOG_UNCOND (" m_initPosLES[LEO_index] " << m_initPosLES[LEO_index]);
         dev->LEOInitLinkDst (m_initPosLES[LEO_index], GESPos, m_GESdeviceMapPosition, GESNUM, LEONUM, PosShiftInterval);
         LEO_index++; 
@@ -856,14 +903,48 @@ PointToPointHelper::InitTopologyGES (uint32_t LEONUM, uint32_t GESNUM, uint32_t 
       {
         Ptr<PointToPointNetDevice> dev = m_nodeDeviceMap.find (nodeid)->second;
         //  LEO_index 
-        NS_LOG_UNCOND (" LEO_index " << LEO_index);
+        NS_LOG_UNCOND (" LEO_index " << LEO_index << "\t" << Mac48Address::ConvertFrom(dev->GetAddress ()) );
         NS_LOG_UNCOND (" m_initPosLES[LEO_index] " << m_initPosLES[LEO_index]);
-        dev->LEOInitLinkDst (m_initPosLES[LEO_index], GESPos, m_GESdeviceMapPosition, GESNUM, LEONUM, PosShiftInterval);
+        dev->LEOInitLinkDst (m_nodeDeviceMap, m_initPosLES[LEO_index], GESPos, m_GESdeviceMapPosition, GESNUM, LEONUM, PosShiftInterval);
         LEO_index++; 
+        //
       }
-     
+    }
+      
+      
+    //LEO_index = 0; // allow LEO device to have globe view of 
+     /* 
+     std::list< Ptr<Node> >::iterator tt;   
+    for (it = m_nodeList.begin(); it != m_nodeList.end(); ++it)
+    {
+      uint32_t nodek = (*it)->GetId ();
+      Ptr<PointToPointNetDevice> devk;
+      if (nodek < LEONUM)
+            devk = m_nodeDeviceMap.find (nodek)->second;
+      else 
+          break;
+      
+       NS_LOG_UNCOND (" globe topology for node " << nodek);
+       LEO_index = 0;
+      for (tt = m_nodeList.begin(); tt != m_nodeList.end(); ++tt)
+      {
+        uint32_t nodeid = (*tt)->GetId ();
+        //LEO
+        if (nodeid < LEONUM )
+          {
+            Ptr<PointToPointNetDevice> dev = m_nodeDeviceMap.find (nodeid)->second;
+            //  LEO_index 
+            NS_LOG_UNCOND (" LEO_index " << LEO_index);
+            NS_LOG_UNCOND (" m_initPosLES[LEO_index] " << m_initPosLES[LEO_index]);
+            Mac48Address addr = Mac48Address::ConvertFrom(dev->GetAddress ());
+            devk->LEOInitLinkDstAll (addr, m_initPosLES[LEO_index], GESPos, m_GESdeviceMapPosition, GESNUM, LEONUM, PosShiftInterval);
+            //dev->LEOInitLinkDst (m_initPosLES[LEO_index], GESPos, m_GESdeviceMapPosition, GESNUM, LEONUM, PosShiftInterval);
+            LEO_index++; 
+          }
+      }
      NS_LOG_UNCOND (" (*it)->GetId () " << (*it)->GetId ());
     }
+     */
     
   
   //PointToPointNetDeviceGES::InitLinkDst (uint32_t position, uint32_t InitPosLES [], std::map<uint32_t, Mac48Address> DeviceMapPosition, uint32_t NumLEO, Time interval) 

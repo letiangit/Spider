@@ -45,7 +45,7 @@ ShortPath::printSolution(uint32_t dist[],uint32_t PreNodes[V], uint32_t src)
        if (src == i)
             continue;
         
-        //std::cout <<  src << " -> " << i << ", dist "<< dist[i]  << std::endl;
+        std::cout <<  src << " -> " << i << ", dist "<< dist[i]  << std::endl;
         nexthop = SearchPath (PreNodes, src, i);
         //std::cout <<  " next hop " << nexthop  << std::endl;
         RoutingTable[i] = nexthop;
@@ -148,13 +148,13 @@ ShortPath::SearchPath(uint32_t prev[V],uint32_t src, uint32_t dst) // v: src, u 
 		tmp = prev[tmp];
 	}
 	que[tot] = src;
-        /*
+        
 	for(uint32_t i=tot; i>=1; --i)
 		if(i != 1)
 			std::cout << que[i] << " -> ";
 		else
 			std::cout << que[i] << std::endl;
-        */
+        
         return que[tot-1]; // next hop
 }
 
