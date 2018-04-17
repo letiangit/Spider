@@ -633,11 +633,14 @@ private:
     EventId ARQAckTimeoutEvent;
     Time ARQAckTimer;
     
-    uint32_t ARQ_Packetid;
+    uint32_t ARQ_Packetid[100];
     
     uint32_t BUFFERSIZE;
     
     Ptr<UniformRandomVariable> m_random;  //!< Provides uniform random variables.
+    std::map<Mac48Address, uint32_t> m_RemoteIdMap;
+    std::map<Mac48Address, uint32_t>::iterator m_RemoteIdMapIterator;
+    uint32_t m_RemoteIdCount;
 
 
 

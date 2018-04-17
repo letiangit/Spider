@@ -253,6 +253,7 @@ PointToPointNetDeviceGES::PointToPointNetDeviceGES ()
     m_packetId (0),
     ARQAckTimer (Seconds(10)),
     m_LEOcount (0),
+    m_RemoteIdCount(0),    
     m_currentPkt (0)
 {
   NS_LOG_FUNCTION (this);
@@ -2177,7 +2178,7 @@ PointToPointNetDeviceGES::ARQSend (RemoteSatelliteARQBufferTx * buffer)
 Ptr<Packet> 
 PointToPointNetDeviceGES::ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Packet> packet)
 {
-   
+    uint32_t index;
      NS_LOG_DEBUG  (GetAddress () <<"buffer->m_listPacket->size () " <<  buffer->m_listPacket->size ()  << ", buffer->m_bufferSize " << buffer->m_bufferSize); // || buffer->m_listPacket->size () < buffer->m_bufferSize);
 
     NS_ASSERT (buffer->m_listPacket->size () < buffer->m_bufferSize || buffer->m_listPacket->size () == buffer->m_bufferSize );
@@ -2187,11 +2188,21 @@ PointToPointNetDeviceGES::ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Pack
     packet->PeekHeader (ppp);
     Time txTime = Seconds (0);
     
-    NS_LOG_UNCOND(GetAddress () << " original id  " << ppp.GetID()  << " new id " << ARQ_Packetid);
+    Mac48Address addrRemote = ppp.GetDestAddre ();    
+    m_RemoteIdMapIterator = m_RemoteIdMap.find(addrRemote);
+    if (m_RemoteIdMapIterator == m_RemoteIdMap.end())
+      {
+         m_RemoteIdMap[addrRemote] = m_RemoteIdCount;
+         ARQ_Packetid[m_RemoteIdCount]=0;
+         m_RemoteIdCount++;
+      }
+    index = m_RemoteIdMap.find(addrRemote)->second;
+    
+    NS_LOG_UNCOND(GetAddress () << " original id  " << ppp.GetID()  << " new id " << ARQ_Packetid[index]);
         
     uint16_t protocol = 0;
      ProcessHeader (packet, protocol);//t0 do
-     ppp.SetID (ARQ_Packetid);
+     ppp.SetID (ARQ_Packetid[index]);
      packet->AddHeader (ppp);
      
      PppHeader pppTest;
@@ -2203,11 +2214,11 @@ PointToPointNetDeviceGES::ARQSend (RemoteSatelliteARQBufferTx * buffer, Ptr<Pack
     buffer->m_listPacket->push_back (packet);
     buffer->m_listTxTime->push_back (txTime);
     //buffer->m_listPacketId->push_back (ppp.GetID ());
-    buffer->m_listPacketId->push_back (ARQ_Packetid);
+    buffer->m_listPacketId->push_back (ARQ_Packetid[index]);
     buffer->m_listPacketStatus->push_back (NO_TRANSMITTED);
     buffer->m_listPacketRetryNum->push_back (0);
     
-    ARQ_Packetid++;
+    ARQ_Packetid[index]++;
     //NS_LOG_DEBUG (GetAddress () << "  ARQSend am_listPacketId size " << buffer->m_listPacketId->size () << ", id " << pppTest.GetID () << ", " << pppTest.GetDestAddre ());
 
     

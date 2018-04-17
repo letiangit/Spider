@@ -809,7 +809,10 @@ private:
     EventId ARQAckTimeoutEvent;
     Time ARQAckTimer;
     
-    uint32_t ARQ_Packetid;
+    uint32_t ARQ_Packetid[100];
+    std::map<Mac48Address, uint32_t> m_RemoteIdMap;
+    std::map<Mac48Address, uint32_t>::iterator m_RemoteIdMapIterator;
+    uint32_t m_RemoteIdCount;
     
     uint32_t BUFFERSIZE;
     
