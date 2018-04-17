@@ -943,6 +943,7 @@ PointToPointNetDevice::TransmitStartTwoInterface (Ptr<Packet> packet)
                     m_txMachineState = BUSY;
                     m_currentPkt = packet;
                     TransmitComplete ();
+                    return;
               }
            }
           
@@ -966,8 +967,8 @@ PointToPointNetDevice::TransmitStartTwoInterface (Ptr<Packet> packet)
             }
           else
             {
-              //goto LinkedDevice;
-              TransmitStart (packet);
+              goto LinkedDevice;
+              //TransmitStart (packet);
             }
           return;
         
