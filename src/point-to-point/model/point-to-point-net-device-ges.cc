@@ -253,7 +253,8 @@ PointToPointNetDeviceGES::PointToPointNetDeviceGES ()
     m_packetId (0),
     ARQAckTimer (Seconds(10)),
     m_LEOcount (0),
-    m_RemoteIdCount(0),    
+    m_RemoteIdCount(0),  
+    m_GESLEOAcqTime (MilliSeconds(500)),
     m_currentPkt (0)
 {
   NS_LOG_FUNCTION (this);
@@ -338,6 +339,71 @@ PointToPointNetDeviceGES::SetInterframeGap (Time t)
 {
   NS_LOG_FUNCTION (this << t.GetSeconds ());
   m_tInterframeGap = t;
+}
+
+void 
+PointToPointNetDeviceGES::AcquisitionTimeLeft (void)
+{   
+    if (Simulator::Now () < m_GESLEOAcqStart + m_GESLEOAcqTime )
+      {
+        m_acquisition = true;
+        NS_LOG_UNCOND ("AcquisitionTimeLeft");
+        m_acquisitionTimeLeft = m_GESLEOAcqTime - (Simulator::Now () - m_GESLEOAcqStart );   
+      }
+    else
+        m_acquisition = false;  
+}
+
+
+void 
+PointToPointNetDeviceGES::TimeNextAcquisition (void)
+{   
+    Time GESHandOverInterval;
+    if ( m_DevSameNode0Flag) //attached to LEO
+      {
+        GESHandOverInterval = m_dstGESinterval;
+      }
+   else //attached to GES
+     { 
+       GESHandOverInterval = m_dstLEOinterval;
+     }
+    
+     Ptr<const Packet>  p = PeekqueueForward ();
+     if (p == 0)
+       {
+         m_beforeNextAcquisition = false;
+         return;
+       }
+         
+     Time txTime = m_bps.CalculateBytesTxTime (p->GetSize ());
+     Time txCompleteTime = txTime + m_tInterframeGap;
+     
+     NS_LOG_UNCOND ("BeforeNextAcquisition");
+     NS_LOG_UNCOND ("m_GESLEOAcqStart " << m_GESLEOAcqStart << " m_dstLEOinterval " << GESHandOverInterval << " now " << Simulator::Now ());
+     m_timeNextAcquisition = m_GESLEOAcqStart + GESHandOverInterval -  Simulator::Now ();
+     if (m_timeNextAcquisition < txCompleteTime)
+         m_beforeNextAcquisition = true;
+     else
+         m_beforeNextAcquisition = false;
+}
+
+
+bool 
+PointToPointNetDeviceGES::CancelTransmission (void)
+{   
+    AcquisitionTimeLeft ();
+    TimeNextAcquisition ();
+    if (m_acquisition)
+        {
+              Simulator::Schedule (m_acquisitionTimeLeft, &PointToPointNetDeviceGES::ForwardDown, this);
+              return true;        
+        }
+    else if ( m_beforeNextAcquisition)
+        {
+            Simulator::Schedule (m_timeNextAcquisition, &PointToPointNetDeviceGES::ForwardDown, this);
+            return true;
+        }
+    return false;
 }
 
 bool
@@ -431,6 +497,13 @@ PointToPointNetDeviceGES::TransmitComplete (void)
   m_currentPkt = 0;
 
   //Ptr<Packet> p = m_queue->Dequeue ();
+  if ( CancelTransmission  () )
+  {
+        NS_LOG_UNCOND (Simulator::Now ().GetMilliSeconds () << "\t" << GetAddress () <<" cancel transmission due to Acquisition." );
+        return;
+  }
+  
+
   Ptr<Packet>  p = DequeueForward ();
   if (p == 0)
     {
@@ -490,6 +563,14 @@ PointToPointNetDeviceGES::ForwardDown (void)
       
  
      LinkedDevice:
+      
+      if ( CancelTransmission  () )
+        {
+         NS_LOG_UNCOND (Simulator::Now ().GetMilliSeconds () << "\t" << GetAddress () <<" cancel transmission due to Acquisition." );
+         return false;
+        } 
+
+     
       if (m_txMachineState == READY)
         {
           Ptr<Packet>  packetsend =  DequeueForward ();
@@ -561,6 +642,32 @@ PointToPointNetDeviceGES::EnqueueForward (Ptr<Packet> packet)
    
 }
 
+Ptr<const Packet>  
+PointToPointNetDeviceGES::PeekqueueForward (void)
+{
+   Ptr<const Packet>  packet;
+   for (uint8_t qos = 5; qos > 0; qos--)
+     {
+        packet = m_queueForward.find (qos-1)->second->Peek();
+        if (packet != 0)
+         {    
+           PppHeader ppp;
+           packet->PeekHeader (ppp); 
+           if (qos < 5)
+             {
+              //NS_LOG_DEBUG ( "size " << m_queueForward.find (qos-1)->second->GetNPackets () );
+              //NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress () <<" forwardqueue dequeue m_Qos " << uint16_t(ppp.GetQos ()) << ", id " << ppp.GetID () << ", size " << packet->GetSize () << " src " << ppp.GetSourceAddre ());  
+             }
+           if (Simulator::Now().GetSeconds () > 14900)
+             {
+              //NS_LOG_DEBUG ( "size " << m_queueForward.find (qos-1)->second->GetNPackets () );
+              //NS_LOG_DEBUG (Simulator::Now () << "\t" << GetAddress () <<" forwardqueue dequeue m_Qos " << uint16_t(ppp.GetQos ()) << ", id " << ppp.GetID () << ", size " << packet->GetSize () << " src " << ppp.GetSourceAddre ());  
+             }
+           return packet;
+         }
+     } 
+   return 0;
+}
 
 Ptr<Packet>  
 PointToPointNetDeviceGES::DequeueForward (void)
@@ -1287,9 +1394,9 @@ PointToPointNetDeviceGES::updateLinkDst ( )
       
         //use DeviceMapPosition to get device
 
-        
+        m_GESLEOAcqStart = Simulator::Now ();
         m_dstLEOAddr = m_deviceMapPosition.find (leoP)->second;
-        NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " GES links to LEO "  << m_dstLEOAddr);
+        NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " GES links to LEO "  << m_dstLEOAddr << " m_dstLEOinterval " << m_dstLEOinterval);
         // Circular
         // example, Assuming that CHAR_BITS == 8, x = ( x << 1U ) | ( x >> 7U ) ; would do a circular bit shift left by one.
         //m_indicator << 1;
@@ -1469,6 +1576,7 @@ PointToPointNetDeviceGES::LEOupdateLinkDst ( )
        
         if (connected)
         {
+          m_GESLEOAcqStart = Simulator::Now ();
           m_dstGESAddr = m_deviceMapPosition.find (ges)->second;
           NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " LEO links to GES "  << m_dstGESAddr);
         }
@@ -1476,7 +1584,7 @@ PointToPointNetDeviceGES::LEOupdateLinkDst ( )
         {
           m_dstGESAddr = Mac48Address ("00:00:00:00:00:00"); //unreachable dst
         }
-        
+        NS_LOG_UNCOND (Simulator::Now () << "\t" << GetAddress () << " m_dstGESinterval "  << m_dstGESinterval);
         // Circular
         // example, Assuming that CHAR_BITS == 8, x = ( x << 1U ) | ( x >> 7U ) ; would do a circular bit shift left by one.
         //m_indicator << 1;

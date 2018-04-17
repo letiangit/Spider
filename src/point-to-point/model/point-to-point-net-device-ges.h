@@ -255,6 +255,10 @@ void ARQN_ACKRecevie (Mac48Address dst, uint32_t packetid);
 
 bool ARQTxBufferCheck (RemoteSatelliteARQBufferTx * buffer) const;
 bool ARQRxBufferCheck (RemoteSatelliteARQBuffer * buffer) const;
+void AcquisitionTimeLeft (void);
+void TimeNextAcquisition (void);
+bool CancelTransmission (void);
+Ptr<const Packet> PeekqueueForward (void);
 
 
 
@@ -641,7 +645,13 @@ private:
     std::map<Mac48Address, uint32_t> m_RemoteIdMap;
     std::map<Mac48Address, uint32_t>::iterator m_RemoteIdMapIterator;
     uint32_t m_RemoteIdCount;
-
+    Time m_GESLEOAcqStart;
+    Time m_GESLEOAcqTime; //milliseconds
+    
+    bool m_acquisition;
+    Time m_acquisitionTimeLeft;
+    bool m_beforeNextAcquisition;
+    Time m_timeNextAcquisition;
 
 
 };
