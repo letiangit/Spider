@@ -2167,6 +2167,24 @@ PointToPointNetDevice::ReceiveFromGES (Ptr<Packet> packet)
                 {
                   return;
                 }
+               else if (m_loadBalance)
+                {
+                  if (ppp.GetType ()==DATATYPE || ppp.GetType() == DATAACK )
+                      {                           
+                            if (m_interfaceGES)
+                             {
+                                m_interfaceGES = false;
+                                Forward (originalPacket, PACKETREPEATNUMBER-1);
+                                //NS_LOG_UNCOND("TX \t" << Mac48Address::ConvertFrom(GetAddress ()) << "\t"  << ppp.GetSourceAddre()  << "\t" << ppp.GetDestAddre() << "\t"  << ppp.GetID () << "\t" << p->GetSize()  << "\t"  <<  Simulator::Now().GetMilliSeconds()  );
+                             }
+                            else
+                             {
+                                m_interfaceGES = true;   
+                                m_DevSameNode->Forward (originalPacket, PACKETREPEATNUMBER-1); 
+                             }
+                         
+                       }     
+                }
                else
                {     
                     uint16_t nextHop = LookupRoutingTable (ppp.GetDestAddre ());

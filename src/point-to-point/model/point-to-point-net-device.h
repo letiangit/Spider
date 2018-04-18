@@ -822,6 +822,7 @@ private:
     bool m_loadBalance;
     bool m_src;
     bool m_interface;
+    bool m_interfaceGES;
 };
 
 
