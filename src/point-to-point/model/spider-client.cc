@@ -93,7 +93,7 @@ SpiderClient::SpiderClient ()
   m_constantRate = true;
   m_IsBurstType = false;
   m_poissonRate = 1.0;
-  chunksize = 1314;
+  chunksize = 2647;
   m_burstNum = 1;
 }
 

@@ -41,6 +41,7 @@
 #include <stdlib.h>
 #include <ctime>
 #include <fstream>
+#include <algorithm> 
 
 using namespace std;
 namespace ns3 {
@@ -138,7 +139,22 @@ PointToPointNetDevice::GetTypeId (void)
                    BooleanValue (false),
                    MakeBooleanAccessor (&PointToPointNetDevice::m_loadBalance),
                    MakeBooleanChecker ())
-  
+    .AddAttribute ("Congestion_IUP", "parameters used for congestion control",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&PointToPointNetDevice::Congestion_UP),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("Congestion_IDN", "parameters used for congestion control",
+                   UintegerValue (1),
+                   MakeUintegerAccessor (&PointToPointNetDevice::Congestion_DN),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("Congestion_IX", "parameters used for congestion control",
+                   UintegerValue (3),
+                   MakeUintegerAccessor (&PointToPointNetDevice::Congestion_X),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("CongestionControlEnabled", "parameters used for congestion control",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&PointToPointNetDevice::CongestionControl),
+                   MakeBooleanChecker ())
     // 
     // Transmit queueing discipline for the device which includes its own set
     // of trace hooks.
@@ -338,6 +354,7 @@ PointToPointNetDevice::PointToPointNetDevice ()
     m_TopoInitialized (false),
     ARQAckTimer (Seconds(10)),
     m_RemoteIdCount(0),
+    Congestion_count (0),
     m_currentPkt (0)
 {
   NS_LOG_FUNCTION (this);
@@ -4408,6 +4425,15 @@ PointToPointNetDevice::ARQAckTimeout (RemoteSatelliteARQBufferTx * buffer)
          if (currentTimeUs - txTimeUs > ARQAckTimer.GetMicroSeconds ())
            {
              IsPacketTimeOut = true;
+             if (Congestion_count == Congestion_X)
+               {
+                  Congestion_count = 0;
+                  buffer->Congestion_W = std::max (buffer->Congestion_W / Congestion_DN, uint32_t(1));
+               }
+             else
+              {
+                 Congestion_count++;
+              }
            }
         
          
@@ -4528,6 +4554,7 @@ PointToPointNetDevice::ARQACKRecevie (Mac48Address dst, uint32_t packetid)
 {
     RemoteSatelliteTx * Satellite = ARQLookupTx (dst, packetid); 
     RemoteSatelliteARQBufferTx * buffer = Satellite->m_buffer;
+    buffer->Congestion_W = std::min (buffer->Congestion_W + Congestion_UP, buffer->m_bufferSize);
     
     //NS_LOG_DEBUG (GetAddress () << " receives ack, with id " << packetid  << ", from  " <<  dst );
     //NS_LOG_DEBUG ("buffer->m_bufferSize " << buffer->m_bufferSize <<  ", buffer->m_listPacket->size " << buffer->m_listPacket->size () );
@@ -4649,10 +4676,14 @@ PointToPointNetDevice::ARQSend (RemoteSatelliteARQBufferTx * buffer)
     std::list<uint32_t >::const_iterator PacketRetryNumiterator = buffer->m_listPacketRetryNum->begin ();
 
     ARQTxBufferCheck (buffer);
-
+    NS_ASSERT (buffer->m_listPacketId->front () == buffer->m_bufferStart);
     uint32_t retry_num = 0;        
     for (std::list<uint32_t >::const_iterator it = buffer->m_listPacketStatus->begin (); it != buffer->m_listPacketStatus->end (); it++)
     {
+        if  (CongestionControl && ( (*PacketIditerator) >=  buffer->m_bufferStart + buffer->Congestion_W ))
+        {
+           return 0;   
+        }
         if ((*it) == NO_TRANSMITTED)
         {
             packet =  (*Packetiterator);
@@ -4781,6 +4812,7 @@ PointToPointNetDevice::ARQLookupTx (Mac48Address dst, uint32_t packetid)  const
   
   buffer->m_bufferStart = 0;
   buffer->m_bufferSize = BUFFERSIZE;
+  buffer->Congestion_W = BUFFERSIZE;
   
   //create new RemoteSatellite
   RemoteSatelliteTx *Satellite = new RemoteSatelliteTx ();

@@ -652,7 +652,12 @@ private:
     Time m_acquisitionTimeLeft;
     bool m_beforeNextAcquisition;
     Time m_timeNextAcquisition;
-
+    
+    uint32_t Congestion_UP;
+    uint32_t Congestion_DN;
+    uint32_t Congestion_X;
+    uint32_t Congestion_count;
+    bool CongestionControl;
 
 };
 

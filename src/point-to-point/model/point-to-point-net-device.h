@@ -823,6 +823,14 @@ private:
     bool m_src;
     bool m_interface;
     bool m_interfaceGES;
+    
+    uint32_t Congestion_UP;
+    uint32_t Congestion_DN;
+    uint32_t Congestion_X;
+    uint32_t Congestion_count;
+    bool CongestionControl;
+    
+    
 };
 
 
@@ -859,6 +867,7 @@ struct RemoteSatelliteARQBufferTx
 {
    uint32_t m_bufferStart;
    uint32_t m_bufferSize;
+   uint32_t Congestion_W;
    
    
   std::list<Ptr<Packet> > * m_listPacket;
